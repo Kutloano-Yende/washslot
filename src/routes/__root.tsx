@@ -8,8 +8,8 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Demo Wash Co." },
-      { name: "theme-color", content: "#0f6e6b" },
+      { title: "WashSlot" },
+      { name: "theme-color", content: "#0a6270" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
