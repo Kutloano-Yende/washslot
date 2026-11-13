@@ -18,9 +18,9 @@ import {
   type Offer,
   type Status,
 } from "./engine.ts";
-import { DEMO_ID, byText, getBusiness, nearest, type Nearby } from "./businesses.ts";
+import { byText, nearest, type Nearby } from "./businesses.ts";
 import { friendlyReply } from "./friendly.ts";
-import { SLOTS, WASH_BAY, ZONES, type Slot } from "./seeds.ts";
+import { DEMO_ID, SLOTS, WASH_BAY, ZONES, type Business, type Slot } from "./seeds.ts";
 
 export type Mode = "bring" | "collect" | "home";
 type Field = "name" | "mode" | "location" | "vehicle" | "date" | "time" | "scent" | "allergies";
@@ -230,9 +230,24 @@ function nextField(d: Draft): Field | null {
   return null;
 }
 
-function freeSlots(ledger: Ledger, date: string): Slot[] {
-  return SLOTS.filter((s) => !occupied(ledger.bookings, date, s));
+/** Online booking closes this many minutes before a slot starts, so the crew is not surprised. */
+export const CUTOFF_MIN = 30;
+/** The clock for the message being handled (set at the start of converse; JS runs one message at a time here). */
+let clock = { today: "", nowMin: 0 };
+
+export function minutesNowSAST(now = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Johannesburg", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return (get("hour") % 24) * 60 + get("minute");
 }
+
+/** A slot today that has started or is inside the cutoff cannot be booked online any more. */
+const isClosed = (date: string, slot: string) => date === clock.today && Number(slot.slice(0, 2)) * 60 - CUTOFF_MIN < clock.nowMin;
+
+function freeSlots(ledger: Ledger, date: string): Slot[] {
+  return SLOTS.filter((s) => !occupied(ledger.bookings, date, s) && !isClosed(date, s));
+}
+
 const longDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 
@@ -272,6 +287,7 @@ function recap(newly: string[]): string {
   return newly.length ? `Got it ✅ ${newly.join(" · ")}\n\n` : "";
 }
 
+const NOW_INTENT = /\b(right now|come now|walk[- ]?in|asap|nearby|free now|available now|straight away|this morning|i'?m close|now)\b/i;
 const GREETING = /^\s*(hi+|hey+|hello+|howzit|heita|yo|sawubona|molo|dumela|good (morning|afternoon|evening))\b/i;
 const ASKS_WHO = /\b(your name|who are you|who is this|are you (a )?(bot|human|real|robot|ai))\b/i;
 const HOSTILE = /ignore (your |the )?rules|don'?t check the files|say i am booked|without checking/i;
@@ -290,15 +306,24 @@ export function converse(
   ledger: Ledger,
   stateIn: IntakeState,
   message: string,
-  opts: { profileName?: string | null; today?: string; location?: { lat: number; lng: number } | null } = {},
+  opts: {
+    /** Minutes since midnight in South Africa; injectable for tests. */
+    nowMinutes?: number;
+    profileName?: string | null;
+    today?: string;
+    location?: { lat: number; lng: number } | null;
+    /** The businesses on the platform (needed to choose a wash and to name the one being booked). */
+    businesses?: Business[];
+  } = {},
 ): ConverseResult {
   const today = opts.today ?? todayISO();
+  clock = { today, nowMin: opts.nowMinutes ?? minutesNowSAST() };
   const state: IntakeState = { ...stateIn, draft: { ...stateIn.draft } };
   const d = state.draft;
   const text = message.trim();
 
   // 0. Several car washes are registered: find the client's nearest one first.
-  if (!state.businessId && !HOSTILE.test(text)) return chooseBusiness(ledger, state, text, opts.location ?? null);
+  if (!state.businessId && !HOSTILE.test(text)) return chooseBusiness(ledger, state, text, opts.location ?? null, opts.businesses ?? []);
 
   // 1. Things the engine already handles well: a pending offer, a repeated yes, a customer ID, tampering.
   const hostile = HOSTILE.test(text);
@@ -356,6 +381,25 @@ export function converse(
   if (time === "other") oddTime = true;
   else if (time) d.time = time;
 
+  // "Can I come now?": a walk-in. Use today and the earliest slot that is still open.
+  let walkInNote = "";
+  if (!date && !d.date && NOW_INTENT.test(text)) {
+    if (weekdayOf(today) === 0) {
+      walkInNote = "We're closed on Sundays, sorry! Which day from Monday would suit you?\n\n";
+    } else {
+      d.date = today;
+      if (!d.mode) d.mode = "bring";
+      const open = freeSlots(ledger, today);
+      if (!d.time && open.length) {
+        d.time = open[0];
+        walkInNote = `Walk-ins are welcome 🙌 The earliest free slot today is ${open[0]}.\n\n`;
+      } else if (!open.length) {
+        d.date = null;
+        walkInNote = "We're fully booked for the rest of today 😕 Which other day suits you?\n\n";
+      }
+    }
+  }
+
   const scent = parseScent(text) ?? (awaiting === "scent" && NONE.test(text) ? "No scent" : null);
   if (scent) d.scent = scent;
   if (awaiting === "allergies") {
@@ -381,7 +425,7 @@ export function converse(
   const nameHello = d.name && !was.name ? `Nice to meet you, ${d.name}! 👋\n\n` : "";
   const greeted = GREETING.test(text) && !d.name;
   const intro = greeted || ASKS_WHO.test(text)
-    ? `${greeted ? "Hey! 👋 " : ""}I'm ${BOT} 🧽, ${getBusiness(state.businessId)?.name ?? "WashSlot"}'s booking assistant (I'm a bot, but a friendly one!). Let's get your car sparkling ✨\n\n`
+    ? `${greeted ? "Hey! 👋 " : ""}I'm ${BOT} 🧽, ${(opts.businesses ?? []).find((b) => b.id === state.businessId)?.name ?? "WashSlot"}'s booking assistant (I'm a bot, but a friendly one!). Let's get your car sparkling ✨\n\n`
     : "";
 
   let notice = "";
@@ -402,13 +446,14 @@ export function converse(
   // 4. Ask the next question, one at a time, or move on to the quote.
   if (pastDate || sunday) { d.date = null; if (d.awaiting === "date" || !d.date) d.awaiting = "date"; }
   // Date and time both known but that slot is full: say so now and ask for another time.
-  if (d.date && d.time && occupied(ledger.bookings, d.date, d.time)) {
+  if (d.date && d.time && (occupied(ledger.bookings, d.date, d.time) || isClosed(d.date, d.time))) {
     const free = freeSlots(ledger, d.date);
+    const passed = isClosed(d.date, d.time) && !occupied(ledger.bookings, d.date, d.time);
     d.time = null;
     slotTaken = true;
     notice = free.length
-      ? `${notice}${longDate(d.date)} at that time is already taken 😅 Free slots: ${free.join(", ")}.\n\n`
-      : `${notice}Every slot on ${longDate(d.date)} is taken 😅\n\n`;
+      ? `${notice}${passed ? `That time has passed or is about to start (online booking closes ${CUTOFF_MIN} minutes before a slot)` : `${longDate(d.date)} at that time is already taken`} 😅 Free slots: ${free.join(", ")}.\n\n`
+      : `${notice}${passed ? "There are no slots left to book online today" : `Every slot on ${longDate(d.date)} is taken`} 😅\n\n`;
     if (!free.length) d.date = null;
   }
   const next = nextField(d);
@@ -418,7 +463,7 @@ export function converse(
     const q = question(d.awaiting, d, ledger);
     // A notice that already asks for a new day/time replaces the generic question and the recap.
     const asksAgain = pastDate || sunday || oddTime;
-    const body = asksAgain ? notice.trimEnd() : slotTaken ? `${notice}${q}` : `${notice}${recap(newly)}${q}`;
+    const body = asksAgain ? notice.trimEnd() : slotTaken ? `${notice}${q}` : `${walkInNote}${notice}${recap(newly)}${q}`;
     return out(state, ledger, `${intro}${nameHello}${body}`);
   }
 
@@ -496,6 +541,7 @@ function chooseBusiness(
   state: IntakeState,
   text: string,
   loc: { lat: number; lng: number } | null,
+  businesses: Business[],
 ): ConverseResult {
   const greeted = GREETING.test(text);
   const hi = state.introduced
@@ -504,9 +550,10 @@ function chooseBusiness(
   state.introduced = true;
 
   const pick = state.choices.length ? text.trim().match(/^([1-9])\b/) : null;
-  let chosen = pick ? getBusiness(state.choices[+pick[1] - 1]) : undefined;
+  const byId = (id: string | undefined) => businesses.find((b) => b.id === id);
+  let chosen = pick ? byId(state.choices[+pick[1] - 1]) : undefined;
   if (!chosen && state.choices.length) {
-    chosen = state.choices.map((id) => getBusiness(id)).find((b) => b && text.toLowerCase().includes(b.name.toLowerCase()));
+    chosen = state.choices.map((id) => byId(id)).find((b) => b && text.toLowerCase().includes(b.name.toLowerCase()));
   }
   if (chosen) {
     state.businessId = chosen.id;
@@ -518,12 +565,12 @@ function chooseBusiness(
     );
   }
   if (loc) {
-    const found = nearest(loc.lat, loc.lng, 3);
+    const found = nearest(businesses, loc.lat, loc.lng, 3);
     if (found.length) return out(state, ledger, listBusinesses(state, found, `${hi}Thanks for the pin 📍 These are the car washes closest to you:`));
   }
   const area = text.replace(GREETING, "").trim();
   if (/[a-z]{4}/i.test(area)) {
-    const found = byText(area, 3);
+    const found = byText(businesses, area, 3);
     return out(state, ledger, listBusinesses(state, found, `${hi}Here are the car washes registered with us:`));
   }
   return out(

@@ -1,38 +1,34 @@
 /**
- * The car washes registered on the platform.
+ * Car wash businesses on the platform: pure logic only (no storage). Where they live is up to repo.ts.
  *
  * Clients share a location pin and are shown the nearest APPROVED businesses. A new sign-up starts
  * "pending" so a stranger cannot put a fake business in front of clients; the platform admin approves it.
- *
- * In-memory on globalThis: fine for a single long-lived process. A real deployment needs a database,
- * otherwise registrations are lost on restart.
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   DEMO_CONFIG,
+  DEMO_ID,
   SLOTS,
   WASH_BAY,
-  activate,
   type Branch,
   type Business,
   type Service,
   type Zone,
 } from "./seeds.ts";
 
-export const DEMO_ID = "demo-wash-co";
+export { DEMO_ID };
 /** Opens the sample business's dashboard. Sample data only. */
 export const DEMO_KEY = "demo";
 
-const KEY = "__washslot_businesses__";
-const g = globalThis as unknown as Record<string, Business[] | undefined>;
+export const hashKey = (key: string): string => createHash("sha256").update(key).digest("hex");
 
 const now = () => new Date().toISOString();
 
 /** Sample businesses so the nearest-wash search can be shown. Replaced by real sign-ups. */
-function seedBusinesses(): Business[] {
+export function seedBusinesses(): Business[] {
   const simple = (id: string, name: string, address: string, lat: number, lng: number, staff: string[]): Business => {
     const cfg = buildConfig({ name, address, lat, lng, sedanPrice: 110, suvPrice: 150, staff, travel: [] });
-    return { id, name, ownerName: "Sample owner", phone: "", address, lat, lng, ...cfg, key: `sample-${id}`, status: "approved", example: true, createdAt: now() };
+    return { id, name, ownerName: "Sample owner", phone: "", address, lat, lng, ...cfg, keyHash: hashKey(`sample-${id}`), status: "approved", example: true, createdAt: now() };
   };
   return [
     {
@@ -44,7 +40,7 @@ function seedBusinesses(): Business[] {
       lat: -26.1467,
       lng: 28.0436,
       ...DEMO_CONFIG,
-      key: DEMO_KEY,
+      keyHash: hashKey(DEMO_KEY),
       status: "approved",
       example: true,
       createdAt: now(),
@@ -52,26 +48,6 @@ function seedBusinesses(): Business[] {
     simple("sparkle-hand-wash", "Sparkle Hand Wash", "Melville, Johannesburg", -26.1818, 28.007, ["Themba", "Nandi", "Jabu"]),
     simple("sandton-shine", "Sandton Shine Car Care", "Sandton, Johannesburg", -26.1076, 28.0567, ["Pieter", "Lindiwe", "Musa", "Anele"]),
   ];
-}
-
-function all(): Business[] {
-  return (g[KEY] ??= seedBusinesses());
-}
-
-export function resetBusinesses(): void {
-  g[KEY] = seedBusinesses();
-}
-
-export const listBusinesses = (opts: { approvedOnly?: boolean } = {}): Business[] =>
-  all().filter((b) => !opts.approvedOnly || b.status === "approved");
-
-export const getBusiness = (id: string | null | undefined): Business | undefined =>
-  all().find((b) => b.id === id);
-
-/** Switch the engine to this business's prices, areas, team and branches. */
-export function activateBusiness(id: string | null | undefined): void {
-  const b = getBusiness(id) ?? getBusiness(DEMO_ID)!;
-  activate(b);
 }
 
 export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
@@ -84,17 +60,19 @@ export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; l
 
 export type Nearby = Business & { km: number };
 
-export function nearest(lat: number, lng: number, n = 3): Nearby[] {
-  return listBusinesses({ approvedOnly: true })
+/** The `n` nearest approved businesses to a pin. */
+export function nearest(list: Business[], lat: number, lng: number, n = 3): Nearby[] {
+  return list
+    .filter((b) => b.status === "approved")
     .map((b) => ({ ...b, km: haversineKm({ lat, lng }, b) }))
     .sort((a, b) => a.km - b.km)
     .slice(0, n);
 }
 
-/** Businesses whose address mentions what the client typed (a suburb), best matches first. */
-export function byText(text: string, n = 3): Business[] {
+/** Approved businesses whose address mentions what the client typed (a suburb), best matches first. */
+export function byText(list: Business[], text: string, n = 3): Business[] {
   const words = text.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4);
-  const approved = listBusinesses({ approvedOnly: true });
+  const approved = list.filter((b) => b.status === "approved");
   const hits = approved.filter((b) => words.some((w) => `${b.address} ${b.name}`.toLowerCase().includes(w)));
   return (hits.length ? hits : approved).slice(0, n);
 }
@@ -141,8 +119,11 @@ export type RegisterInput = {
 
 const clean = (s: unknown, max: number) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, max);
 
-/** Validate and store a sign-up. New businesses wait for approval. Throws a readable message on bad input. */
-export function registerBusiness(raw: RegisterInput): Business {
+/**
+ * Validate a sign-up and build the (pending) business. `existing` is the current list, for the duplicate-name check.
+ * Throws a readable message on bad input. The returned object carries the plain `key` once; only its hash is kept.
+ */
+export function createBusiness(raw: RegisterInput, existing: Business[]): Business {
   const name = clean(raw.name, 60);
   const address = clean(raw.address, 120);
   const staff = (raw.staff ?? []).map((s) => clean(s, 30)).filter(Boolean);
@@ -157,13 +138,14 @@ export function registerBusiness(raw: RegisterInput): Business {
   if (!(sedanPrice > 0 && sedanPrice < 5000) || !(suvPrice > 0 && suvPrice < 5000))
     throw new Error("Sedan and SUV prices must be amounts in rand.");
   if (staff.length < 2) throw new Error("List at least two employees: every job is done by two people.");
-  if (all().some((b) => b.name.toLowerCase() === name.toLowerCase())) throw new Error("That business name is already registered.");
+  if (existing.some((b) => b.name.toLowerCase() === name.toLowerCase())) throw new Error("That business name is already registered.");
   const travel = (raw.travel ?? [])
     .map((t) => ({ suburb: clean(t.suburb, 40), fee: Math.max(0, Math.round(Number(t.fee) || 0)) }))
     .filter((t) => t.suburb.length >= 3)
     .slice(0, 12);
   const id = `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30)}-${randomBytes(2).toString("hex")}`;
-  const business: Business = {
+  const key = randomBytes(12).toString("hex");
+  return {
     id,
     name,
     ownerName: clean(raw.ownerName, 60),
@@ -172,18 +154,11 @@ export function registerBusiness(raw: RegisterInput): Business {
     lat,
     lng,
     ...buildConfig({ name, address, lat, lng, sedanPrice, suvPrice, staff, travel }),
-    key: randomBytes(12).toString("hex"),
+    keyHash: hashKey(key),
+    key,
     status: "pending",
     createdAt: now(),
   };
-  all().push(business);
-  return business;
-}
-
-export function approveBusiness(id: string): Business | undefined {
-  const b = getBusiness(id);
-  if (b) b.status = "approved";
-  return b;
 }
 
 /** Public, safe-to-show view of a business (never includes the key or phone). */

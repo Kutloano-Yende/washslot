@@ -151,6 +151,43 @@ export function assignStaff(bookings: Booking[], date: string, slot: string): [s
   return [ranked[0].name, ranked[1].name];
 }
 
+/**
+ * Add a walk-in (a client who arrived without booking). Uses the same two-employee assignment as an online
+ * booking, so the slot disappears from online availability at once. Returns null when nobody is free.
+ * The owner may pick any slot with two free employees, even one that is closed to online booking.
+ */
+export function addWalkIn(
+  ledgerIn: Ledger,
+  input: { name: string; vehicle: "sedan" | "suv"; make?: string; date: string; slot: Slot },
+): { ledger: Ledger; booking: Booking } | null {
+  const ledger = clone(ledgerIn);
+  const staff = assignStaff(ledger.bookings, input.date, input.slot);
+  const service = SERVICES.find((x) => x.vehicle_type === input.vehicle);
+  if (!staff || !service) return null;
+  const name = input.name.trim().slice(0, 40) || "Walk-in";
+  const customer_id = nextId(ledger.customers.map((c) => c.customer_id), "C");
+  ledger.customers.push({ customer_id, demo_name: name, vehicle_type: input.vehicle, suburb: WASH_BAY, contact_email: "" });
+  const booking: Booking = {
+    booking_id: nextId(ledger.bookings.map((b) => b.booking_id), "B"),
+    customer_id,
+    demo_name: name,
+    service_code: service.service_code,
+    suburb: WASH_BAY,
+    date_sast: input.date,
+    start_time_sast: input.slot,
+    end_time_sast: END_BY_START[input.slot],
+    total_zar: service.base_price_zar,
+    status: "CONFIRMED",
+    staff: [...staff],
+    mode: "bring",
+    make: input.make?.trim().slice(0, 30) || undefined,
+    walk_in: true,
+  };
+  ledger.bookings.push(booking);
+  booking.queue_number = queueNumber(ledger.bookings, booking);
+  return { ledger, booking };
+}
+
 /** 1-based place of a booking in that day's running order (by start time). */
 export function queueNumber(bookings: Booking[], booking: Booking): number {
   const day = bookings
@@ -338,7 +375,7 @@ export function handleEnquiry(
   }
 
   if (parsed.yes && pending) {
-    return confirmOffer(ledger, pending, checks);
+    return confirmOffer(ledger, pending, checks, lastBooking?.booking_id);
   }
 
   if (parsed.yes && pendingDetail) {
@@ -645,7 +682,7 @@ export function handleEnquiry(
   });
 }
 
-function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentResult {
+function confirmOffer(ledger: Ledger, pending: Offer, checks: string[], ownBookingId?: string): AgentResult {
   if (!ledger.bookingsReadable) {
     return pack({
       request_summary: "Yes received but bookings source unreadable.",
@@ -660,9 +697,11 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
     });
   }
 
+  // A repeat only counts when it is this conversation's own booking, never another client who shares a name.
   const existing = ledger.bookings.find(
     (b) =>
-      b.demo_name === pending.demo_name &&
+      !!ownBookingId &&
+      b.booking_id === ownBookingId &&
       b.date_sast === pending.date_sast &&
       b.start_time_sast === pending.start_time_sast &&
       b.status === "CONFIRMED",

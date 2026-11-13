@@ -26,6 +26,7 @@ type Booking = {
   staff?: string[];
   queue_number?: number;
   mode?: "bring" | "collect" | "home";
+  walk_in?: boolean;
   address?: string;
   make?: string;
   scent?: string;
@@ -57,6 +58,24 @@ function Owner() {
   const [denied, setDenied] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [day, setDay] = useState<string>("");
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [releasing, setReleasing] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  /** Walk-in or release. The dashboard refreshes itself within a couple of seconds. */
+  async function act(body: Record<string, unknown>): Promise<boolean> {
+    if (!params) return false;
+    setBusy(true);
+    const res = await fetch("/api/owner-action", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ biz: params.biz, key: params.key, ...body }),
+    }).catch(() => null);
+    setBusy(false);
+    const data = (await res?.json().catch(() => null)) as { ok: boolean; message?: string; error?: string } | null;
+    setNotice({ ok: !!data?.ok, text: data?.message ?? data?.error ?? "Could not reach the server. Try again." });
+    return !!data?.ok;
+  }
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -203,6 +222,41 @@ function Owner() {
         </div>
 
         <aside className="flex flex-col gap-4">
+          <form
+            className="glass-card flex flex-col gap-3 rounded-[var(--radius-card)] p-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.currentTarget;
+              const f = new FormData(form);
+              if (await act({ action: "walkin", name: f.get("name"), make: f.get("make"), vehicle: f.get("vehicle"), slot: f.get("slot") || undefined })) form.reset();
+            }}
+          >
+            <h2 className="font-display text-xl">Add a walk-in</h2>
+            <p className="text-sm text-muted">Someone drove in without booking. This puts two free employees on the job and takes the slot off online booking straight away.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input name="name" required minLength={2} maxLength={40} placeholder="Client name" aria-label="Client name" className="min-h-11 rounded-2xl border border-line bg-white px-3" />
+              <input name="make" maxLength={30} placeholder="Car make (optional)" aria-label="Car make" className="min-h-11 rounded-2xl border border-line bg-white px-3" />
+              <select name="vehicle" aria-label="Vehicle type" className="min-h-11 rounded-2xl border border-line bg-white px-3">
+                <option value="sedan">Sedan</option>
+                <option value="suv">SUV</option>
+              </select>
+              <select name="slot" aria-label="Slot" className="min-h-11 rounded-2xl border border-line bg-white px-3">
+                <option value="">Earliest free slot</option>
+                {SLOTS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" disabled={busy} className="min-h-11 rounded-full bg-accent px-5 font-semibold text-accent-ink disabled:opacity-60">
+              Add walk-in
+            </button>
+            {notice && (
+              <p role="status" className={`rounded-2xl px-3 py-2 text-sm font-semibold ${notice.ok ? "bg-[#e2f6e9] text-[#17683a]" : "bg-[#fff0e4] text-[#9a3412]"}`}>
+                {notice.text}
+              </p>
+            )}
+          </form>
+
           <div className="glass-card rounded-[var(--radius-card)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-xl">{activeDay ? longDate(activeDay) : "Day board"}</h2>
@@ -257,7 +311,18 @@ function Owner() {
                       {b.mode ? MODE_LABEL[b.mode] : b.suburb}
                       {b.address ? ` · ${b.address}, ${b.suburb}` : ""}
                     </p>
-                    <p>Team: <b>{b.staff?.join(" + ") ?? "not assigned"}</b></p>
+                    <p>Team: <b>{b.staff?.join(" + ") ?? "not assigned"}</b>{b.walk_in ? " · walk-in" : ""}</p>
+                    {releasing === b.booking_id ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">Release this slot?</span>
+                        <button type="button" disabled={busy} onClick={async () => { await act({ action: "release", bookingId: b.booking_id }); setReleasing(null); }} className="min-h-11 rounded-full bg-[#9a3412] px-4 font-semibold text-white">Yes, release</button>
+                        <button type="button" onClick={() => setReleasing(null)} className="min-h-11 rounded-full border border-line bg-white px-4 font-semibold">Keep</button>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => setReleasing(b.booking_id)} className="mt-2 min-h-11 rounded-full border border-line bg-white px-4 font-semibold">
+                        Client is late: release slot
+                      </button>
+                    )}
                     {(b.scent || b.allergies) && (
                       <p className="text-muted">
                         {b.scent ? `Scent: ${b.scent}` : ""}

@@ -129,3 +129,56 @@ test("a hostile message never books", () => {
   assert.notEqual(r.status, "CONFIRMED");
   assert.equal(c.ledger.bookings.length, 2);
 });
+
+// ---- the clock and walk-ins (Saturday 14 Nov 2026) ----
+function chatAt(today: string, nowMinutes: number) {
+  let ledger = seedLedger();
+  let state: IntakeState = emptyState();
+  return {
+    say(msg: string) {
+      const r = converse(ledger, state, msg, { today, nowMinutes });
+      ledger = r.ledger;
+      state = r.state;
+      return r;
+    },
+  };
+}
+
+test("a slot that has already started (or starts within 30 minutes) cannot be booked online", () => {
+  const c = chatAt("2026-11-14", 10 * 60 + 40); // 10:40: 11:00 is inside the cutoff
+  const r = c.say("I'm Thandi, BMW sedan, I'll bring it today at 11:00");
+  assert.match(r.reply, /passed or is about to start/i);
+  assert.match(r.reply, /Free slots: 13:00/);
+  assert.doesNotMatch(r.reply, /Free slots:[^\n]*(09:00|11:00)/);
+  assert.equal(r.state.draft.time, null);
+});
+
+test("a later slot today is still open", () => {
+  const c = chatAt("2026-11-14", 10 * 60); // 10:00: 11:00 closes at 10:30
+  const r = c.say("I'm Thandi, BMW sedan, I'll bring it today at 11:00");
+  assert.equal(r.state.draft.time, "11:00");
+  assert.match(r.reply, /scent/i);
+});
+
+test("'can I come now?' picks today and the earliest open slot", () => {
+  const c = chatAt("2026-11-14", 12 * 60);
+  const r = c.say("Hi, I'm Zodwa. I'm nearby, can I come now? BMW sedan");
+  assert.match(r.reply, /Walk-ins are welcome/);
+  assert.match(r.reply, /earliest free slot today is 13:00/);
+  assert.equal(r.state.draft.date, "2026-11-14");
+  assert.equal(r.state.draft.time, "13:00");
+  assert.equal(r.state.draft.mode, "bring");
+});
+
+test("walk-in when the day is over: says so and asks for another day", () => {
+  const c = chatAt("2026-11-14", 16 * 60);
+  const r = c.say("I'm Zodwa, BMW sedan, can I come now?");
+  assert.match(r.reply, /fully booked for the rest of today/i);
+  assert.equal(r.state.draft.date, null);
+});
+
+test("walk-in on a Sunday: closed", () => {
+  const c = chatAt("2026-11-15", 9 * 60);
+  const r = c.say("I'm Zodwa, BMW sedan, can I come now?");
+  assert.match(r.reply, /closed on Sundays/i);
+});

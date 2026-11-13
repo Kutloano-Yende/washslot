@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/simulate")({
             ? { lat: data.lat!, lng: data.lng! }
             : null;
         if (!body && !pin) return Response.json({ ok: false }, { status: 400 });
-        const { reply } = processMessage(from, body, null, pin);
+        const { reply } = await processMessage(from, body, null, pin);
         return Response.json({ ok: true, reply });
       },
     },

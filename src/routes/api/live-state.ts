@@ -5,7 +5,7 @@ import { snapshot } from "@/lib/wash/whatsapp-store";
 export const Route = createFileRoute("/api/live-state")({
   server: {
     handlers: {
-      GET: async () => Response.json(snapshot(), { headers: { "cache-control": "no-store" } }),
+      GET: async () => Response.json(await snapshot(), { headers: { "cache-control": "no-store" } }),
     },
   },
 });

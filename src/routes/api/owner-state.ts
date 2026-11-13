@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/owner-state")({
     handlers: {
       GET: async ({ request }: { request: Request }) => {
         const u = new URL(request.url);
-        const snap = ownerSnapshot(u.searchParams.get("biz") ?? "", u.searchParams.get("key") ?? "");
+        const snap = await ownerSnapshot(u.searchParams.get("biz") ?? "", u.searchParams.get("key") ?? "");
         if (!snap) return new Response("Forbidden", { status: 403 });
         return Response.json(snap, { headers: { "cache-control": "no-store" } });
       },

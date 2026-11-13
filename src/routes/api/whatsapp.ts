@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/whatsapp")({
         console.log(`[whatsapp] POST ok from …${from.replace(/\D/g, "").slice(-4)} (${body.length} chars${pin ? ", location pin" : ""})`);
         if (!from || (!body.trim() && !pin)) return twiml("Hi! Share your location pin 📍 or tell me what you need, and I'll find you a car wash.");
         const profileName = String(form.get("ProfileName") ?? "").slice(0, 80) || null;
-        const { reply } = processMessage(from, body, profileName, pin);
+        const { reply } = await processMessage(from, body, profileName, pin);
         return twiml(reply);
       },
       // GET ?key=…&reset=1 clears the demo book between rehearsals; plain GET is a health check.
@@ -47,10 +47,10 @@ export const Route = createFileRoute("/api/whatsapp")({
         const url = new URL(request.url);
         if (url.searchParams.get("reset") === "1") {
           if (!authorised(request)) return new Response("Forbidden", { status: 403 });
-          resetStore();
+          await resetStore();
           return Response.json({ ok: true, reset: true });
         }
-        return Response.json({ ok: true, bookings: snapshot().bookings.length });
+        return Response.json({ ok: true, bookings: (await snapshot()).bookings.length });
       },
     },
   },

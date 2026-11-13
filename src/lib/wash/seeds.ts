@@ -45,6 +45,8 @@ export type Booking = {
   scent?: string;
   /** Free text, or "none". Used to choose suitable products. */
   allergies?: string;
+  /** Added by the owner for a client who arrived without booking. */
+  walk_in?: boolean;
 };
 
 export let SERVICES: Service[] = [
@@ -176,8 +178,10 @@ export type Business = {
   zones: Zone[];
   staff: Staff[];
   branches: Branch[];
-  /** Secret that opens this business's dashboard. */
-  key: string;
+  /** SHA-256 of the secret that opens this business's dashboard. The secret itself is never stored. */
+  keyHash: string;
+  /** The plain secret, present only on the object returned right after sign-up. */
+  key?: string;
   /** Only approved businesses are shown to clients. */
   status: "pending" | "approved";
   /** True for built-in sample businesses, so they are never mistaken for real sign-ups. */
@@ -197,3 +201,5 @@ export function activate(c: BusinessConfig): void {
   STAFF = c.staff;
   BRANCHES = c.branches;
 }
+
+export const DEMO_ID = "demo-wash-co";

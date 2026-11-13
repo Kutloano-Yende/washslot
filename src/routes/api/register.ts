@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { registerBusiness, type RegisterInput } from "@/lib/wash/businesses";
+import type { RegisterInput } from "@/lib/wash/businesses";
+import { registerNewBusiness } from "@/lib/wash/whatsapp-store";
 
 /**
  * A car wash owner signs up. The business stays "pending" (hidden from clients) until the platform admin
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/api/register")({
         const data = (await request.json().catch(() => null)) as Partial<RegisterInput> | null;
         if (!data) return Response.json({ ok: false, error: "Send the form as JSON." }, { status: 400 });
         try {
-          const b = registerBusiness(data as RegisterInput);
+          const b = await registerNewBusiness(data as RegisterInput);
           return Response.json({
             ok: true,
             id: b.id,

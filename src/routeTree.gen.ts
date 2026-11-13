@@ -14,6 +14,7 @@ import { Route as LiveRouteImport } from './routes/live'
 import { Route as OwnerRouteImport } from './routes/owner'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ApiLiveStateRouteImport } from './routes/api/live-state'
+import { Route as ApiOwnerActionRouteImport } from './routes/api/owner-action'
 import { Route as ApiOwnerStateRouteImport } from './routes/api/owner-state'
 import { Route as ApiPlatformRouteImport } from './routes/api/platform'
 import { Route as ApiRegisterRouteImport } from './routes/api/register'
@@ -44,6 +45,11 @@ const RegisterRoute = RegisterRouteImport.update({
 const ApiLiveStateRoute = ApiLiveStateRouteImport.update({
   id: '/api/live-state',
   path: '/api/live-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerActionRoute = ApiOwnerActionRouteImport.update({
+  id: '/api/owner-action',
+  path: '/api/owner-action',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOwnerStateRoute = ApiOwnerStateRouteImport.update({
@@ -83,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/owner': typeof OwnerRoute
   '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-action': typeof ApiOwnerActionRoute
   '/api/owner-state': typeof ApiOwnerStateRoute
   '/api/platform': typeof ApiPlatformRoute
   '/api/register': typeof ApiRegisterRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/owner': typeof OwnerRoute
   '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-action': typeof ApiOwnerActionRoute
   '/api/owner-state': typeof ApiOwnerStateRoute
   '/api/platform': typeof ApiPlatformRoute
   '/api/register': typeof ApiRegisterRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/owner': typeof OwnerRoute
   '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-action': typeof ApiOwnerActionRoute
   '/api/owner-state': typeof ApiOwnerStateRoute
   '/api/platform': typeof ApiPlatformRoute
   '/api/register': typeof ApiRegisterRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/register'
     | '/api/live-state'
+    | '/api/owner-action'
     | '/api/owner-state'
     | '/api/platform'
     | '/api/register'
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/register'
     | '/api/live-state'
+    | '/api/owner-action'
     | '/api/owner-state'
     | '/api/platform'
     | '/api/register'
@@ -151,6 +162,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/register'
     | '/api/live-state'
+    | '/api/owner-action'
     | '/api/owner-state'
     | '/api/platform'
     | '/api/register'
@@ -165,6 +177,7 @@ export interface RootRouteChildren {
   OwnerRoute: typeof OwnerRoute
   RegisterRoute: typeof RegisterRoute
   ApiLiveStateRoute: typeof ApiLiveStateRoute
+  ApiOwnerActionRoute: typeof ApiOwnerActionRoute
   ApiOwnerStateRoute: typeof ApiOwnerStateRoute
   ApiPlatformRoute: typeof ApiPlatformRoute
   ApiRegisterRoute: typeof ApiRegisterRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/api/live-state'
       fullPath: '/api/live-state'
       preLoaderRoute: typeof ApiLiveStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-action': {
+      id: '/api/owner-action'
+      path: '/api/owner-action'
+      fullPath: '/api/owner-action'
+      preLoaderRoute: typeof ApiOwnerActionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/owner-state': {
@@ -261,6 +281,7 @@ const rootRouteChildren: RootRouteChildren = {
   OwnerRoute: OwnerRoute,
   RegisterRoute: RegisterRoute,
   ApiLiveStateRoute: ApiLiveStateRoute,
+  ApiOwnerActionRoute: ApiOwnerActionRoute,
   ApiOwnerStateRoute: ApiOwnerStateRoute,
   ApiPlatformRoute: ApiPlatformRoute,
   ApiRegisterRoute: ApiRegisterRoute,

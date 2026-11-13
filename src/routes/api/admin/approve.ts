@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { approveBusiness, listBusinesses, publicView } from "@/lib/wash/businesses";
+import { publicView } from "@/lib/wash/businesses";
+import { approve, pendingList } from "@/lib/wash/whatsapp-store";
 
 /**
  * Platform admin only (same secret as the WhatsApp webhook key).
@@ -16,11 +17,11 @@ export const Route = createFileRoute("/api/admin/approve")({
     handlers: {
       GET: async ({ request }: { request: Request }) => {
         if (!authorised(request)) return new Response("Forbidden", { status: 403 });
-        return Response.json({ pending: listBusinesses().filter((b) => b.status === "pending").map(publicView) });
+        return Response.json({ pending: await pendingList() });
       },
       POST: async ({ request }: { request: Request }) => {
         if (!authorised(request)) return new Response("Forbidden", { status: 403 });
-        const b = approveBusiness(new URL(request.url).searchParams.get("id") ?? "");
+        const b = await approve(new URL(request.url).searchParams.get("id") ?? "");
         return b ? Response.json({ ok: true, approved: publicView(b) }) : Response.json({ ok: false }, { status: 404 });
       },
     },
