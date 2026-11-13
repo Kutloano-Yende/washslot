@@ -8,7 +8,7 @@
  * In-memory on globalThis: fine for a single long-lived process. A real deployment needs a database,
  * otherwise bookings and conversations are lost on restart (and on serverless instance recycling).
  */
-import { addWalkIn, occupied, type AgentResult } from "./engine.ts";
+import { addWalkIn, emptyLedger, occupied, type AgentResult } from "./engine.ts";
 import { DEMO_ID, createBusiness, hashKey, publicView, type RegisterInput } from "./businesses.ts";
 import { converse, emptyState, minutesNowSAST, todayISO, type Draft } from "./intake.ts";
 import { getRepo, hashSender, type StoredConvo, type ThreadMessage } from "./repo.ts";
@@ -34,7 +34,8 @@ export function cleanProfileName(raw: string | null | undefined): string | null 
 /** New clients start by choosing a wash when several are registered; with a single wash they go straight in. */
 function newConvo(businesses: Business[]): StoredConvo {
   const approved = businesses.filter((b) => b.status === "approved");
-  const businessId = approved.length > 1 ? null : (approved[0]?.id ?? DEMO_ID);
+  // One wash: go straight in. None or several: start with the "which wash" step.
+  const businessId = approved.length === 1 ? approved[0].id : null;
   return { ...emptyState(businessId), thread: [], startedAt: new Date().toISOString() };
 }
 
@@ -52,23 +53,22 @@ export async function processMessage(
   const last4 = from.replace(/\D/g, "").slice(-4);
   const businesses = await repo.listBusinesses();
   const convo = (await repo.getConvo(hash)) ?? newConvo(businesses);
-  const before = convo.businessId;
-  const biz = businesses.find((b) => b.id === (before ?? DEMO_ID)) ?? businesses[0];
+  // The wash this client is booking with (if it has since disappeared, they choose again).
+  const biz = businesses.find((b) => b.id === convo.businessId && b.status === "approved");
+  const input = biz ? convo : { ...convo, businessId: null };
   const opts = { profileName: cleanProfileName(profileName), location, businesses };
 
   // The engine reads prices, areas and team from the active business, so switch it in the same synchronous
   // step as the call (nothing else can run in between).
   let r: ReturnType<typeof converse>;
-  if (before) {
+  if (biz) {
     r = await repo.updateLedger(biz.id, (ledger) => {
       activate(biz);
-      const out = converse(ledger, convo, body, opts);
+      const out = converse(ledger, input, body, opts);
       return { ledger: out.ledger, out };
     });
   } else {
-    const ledger = await repo.readLedger(biz.id);
-    activate(biz);
-    r = converse(ledger, convo, body, opts);
+    r = converse(emptyLedger(), input, body, opts); // choosing a wash needs no booking book
   }
 
   const next: StoredConvo = {

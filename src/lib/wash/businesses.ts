@@ -15,6 +15,7 @@ import {
   type Service,
   type Zone,
 } from "./seeds.ts";
+import { isProduction } from "./mode.ts";
 
 export { DEMO_ID };
 /** Opens the sample business's dashboard. Sample data only. */
@@ -26,6 +27,8 @@ const now = () => new Date().toISOString();
 
 /** Sample businesses so the nearest-wash search can be shown. Replaced by real sign-ups. */
 export function seedBusinesses(): Business[] {
+  // Production starts empty: only owners who register (and are approved) appear to clients.
+  if (isProduction()) return [];
   const simple = (id: string, name: string, address: string, lat: number, lng: number, staff: string[]): Business => {
     const cfg = buildConfig({ name, address, lat, lng, sedanPrice: 110, suvPrice: 150, staff, travel: [] });
     return { id, name, ownerName: "Sample owner", phone: "", address, lat, lng, ...cfg, keyHash: hashKey(`sample-${id}`), status: "approved", example: true, createdAt: now() };

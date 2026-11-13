@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { isProduction } from "@/lib/wash/mode";
 import { processMessage } from "@/lib/wash/whatsapp-store";
 
 /**
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/api/simulate")({
   server: {
     handlers: {
       POST: async ({ request }: { request: Request }) => {
-        if (!isLocal(request)) return new Response("Forbidden", { status: 403 });
+        if (isProduction() || !isLocal(request)) return new Response("Forbidden", { status: 403 });
         const data = (await request.json().catch(() => ({}))) as {
           customer?: string;
           body?: string;

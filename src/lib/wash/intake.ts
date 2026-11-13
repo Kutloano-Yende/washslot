@@ -543,6 +543,12 @@ function chooseBusiness(
   loc: { lat: number; lng: number } | null,
   businesses: Business[],
 ): ConverseResult {
+  if (!businesses.some((b) => b.status === "approved")) {
+    return out(
+      state, ledger,
+      "Hi! I'm Wash Buddy 🧽 from WashSlot. There are no car washes registered with us yet, so I can't book you in just now. Please try again soon 🙏",
+    );
+  }
   const greeted = GREETING.test(text);
   const hi = state.introduced
     ? ""

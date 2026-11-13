@@ -162,3 +162,27 @@ test("releasing a late client's slot frees their employees for a walk-in", async
   assert.equal((await ownerAction(DEMO_ID, DEMO_KEY, { action: "release", bookingId: "B001" })).ok, false);
   assert.equal((await ownerAction(DEMO_ID, "wrong", { action: "release", bookingId: "B002" })).ok, false);
 });
+
+test("production mode starts with no sample data and tells clients honestly", async () => {
+  const prev = process.env.WASHSLOT_MODE;
+  process.env.WASHSLOT_MODE = "production";
+  try {
+    resetMemoryRepo();
+    assert.equal((await (await getRepo()).listBusinesses()).length, 0);
+    assert.deepEqual(await platformList(), []);
+    const r = await processMessage("whatsapp:+27000000099", "Hi", null);
+    assert.match(r.reply, /no car washes registered/i);
+    assert.equal(await ownerSnapshot(DEMO_ID, DEMO_KEY), null, "the sample dashboard key opens nothing");
+    // A real sign-up then makes the wash available.
+    const b = await registerNewBusiness(input("Real Wash"));
+    assert.equal((await platformList()).length, 0, "still pending");
+    await approve(b.id);
+    assert.equal((await platformList()).length, 1);
+    const first = await processMessage("whatsapp:+27000000098", "Hi", null);
+    assert.match(first.reply, /your name|location/i);
+  } finally {
+    if (prev === undefined) delete process.env.WASHSLOT_MODE;
+    else process.env.WASHSLOT_MODE = prev;
+    resetMemoryRepo();
+  }
+});

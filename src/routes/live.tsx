@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Droplets } from "lucide-react";
+import { DemoOff, useMode } from "@/lib/use-mode";
 
-export const Route = createFileRoute("/live")({ component: Live });
+export const Route = createFileRoute("/live")({ component: LiveGate });
 
 type Msg = { role: "customer" | "assistant"; text: string; at: string; status?: string };
 type State = {
@@ -44,6 +45,12 @@ function pillClass(status?: string) {
   if (status === "PENDING OWNER REVIEW") return "status-pending";
   if (status === "OFFERED") return "status-offered";
   return "status-needs";
+}
+
+function LiveGate() {
+  const mode = useMode();
+  if (!mode) return null;
+  return mode === "production" ? <DemoOff /> : <Live />;
 }
 
 function Live() {
