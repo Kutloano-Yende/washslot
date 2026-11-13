@@ -10,3 +10,5 @@ node_modules/
 screenshots/
 artifacts/
 .DS_Store
+.vercel
+.env*

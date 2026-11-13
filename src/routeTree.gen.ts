@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LiveRouteImport } from './routes/live'
+import { Route as ApiLiveStateRouteImport } from './routes/api/live-state'
+import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLiveStateRoute = ApiLiveStateRouteImport.update({
+  id: '/api/live-state',
+  path: '/api/live-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
+  id: '/api/whatsapp',
+  path: '/api/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/live': typeof LiveRoute
+  '/api/live-state': typeof ApiLiveStateRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/live': typeof LiveRoute
+  '/api/live-state': typeof ApiLiveStateRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/live': typeof LiveRoute
+  '/api/live-state': typeof ApiLiveStateRoute
+  '/api/whatsapp': typeof ApiWhatsappRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/live' | '/api/live-state' | '/api/whatsapp'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/live' | '/api/live-state' | '/api/whatsapp'
+  id: '__root__' | '/' | '/live' | '/api/live-state' | '/api/whatsapp'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LiveRoute: typeof LiveRoute
+  ApiLiveStateRoute: typeof ApiLiveStateRoute
+  ApiWhatsappRoute: typeof ApiWhatsappRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/live-state': {
+      id: '/api/live-state'
+      path: '/api/live-state'
+      fullPath: '/api/live-state'
+      preLoaderRoute: typeof ApiLiveStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp': {
+      id: '/api/whatsapp'
+      path: '/api/whatsapp'
+      fullPath: '/api/whatsapp'
+      preLoaderRoute: typeof ApiWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LiveRoute: LiveRoute,
+  ApiLiveStateRoute: ApiLiveStateRoute,
+  ApiWhatsappRoute: ApiWhatsappRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

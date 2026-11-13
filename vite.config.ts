@@ -150,6 +150,8 @@ export default defineConfig(({ command, isPreview }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
+    // Lets a Cloudflare quick tunnel reach the dev server for the live WhatsApp demo.
+    allowedHosts: [".trycloudflare.com"],
   },
   preview: {
     host: "127.0.0.1",
