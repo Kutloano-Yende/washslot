@@ -1,0 +1,12 @@
+node_modules/
+.project_id
+.github_repo
+.env
+.env.*
+
+# generated / local
+.vercel/
+.grok/
+screenshots/
+artifacts/
+.DS_Store

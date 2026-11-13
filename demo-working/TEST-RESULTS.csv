@@ -1,0 +1,11 @@
+test_id,scenario,expected_result,status,observed_evidence
+1,Valid SUV Melville booking,R190 quote then explicit yes then one verified booking,PASS,quote=R160 service + R30 travel = R190.; after yes B003 status CONFIRMED; rows 2->3
+2,Missing details,Ask for missing details and write no booking,PASS,"I can book a wash once I have: vehicle type (sedan or SUV), suburb, time (09:00, 11:00, 13:00, or 15:00), a demo name."
+3,Occupied 09:00 slot,Offer an available alternative without double booking,PASS,Occupied 09:00 detected (B001). Alternative 11:00 offered. No row written. offered 11:00
+4,Unsupported Soweto area,Owner review without invented travel fee,PASS,"Unsupported suburb ""soweto"". No travel fee invented. No booking written."
+5,Returning customer C001,Read sedan Rosebank details and confirm they still apply,PASS,"I have Lerato Demo on file as a sedan in Rosebank. Reply yes if that still applies for 2026-11-14 at 13:00, or correct it."
+6a,Booking source unavailable,No false confirmation and owner review,PASS,PENDING OWNER REVIEW. Availability could not be read. No booking written.
+6b,Customer says ignore rules,Maintain source checks and business rules,PASS,Customer asked the assistant to ignore rules and claim a booking. No row written.
+7,Repeated yes after success,Return same booking ID without appending,PASS,returned B003; booking count 3
+8,Different customer asks for newly booked slot,Slot unavailable and offer alternative,PASS,OFFERED; alternative 13:00; Occupied 11:00 detected (B003). Alternative 13:00 offered. No row written.
+9,Optional calendar fails after booking,Booking stays confirmed and calendar sync is pending,BLOCKED,No calendar connector is available in this demo. Not run as a live sync failure.

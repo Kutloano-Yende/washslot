@@ -1,0 +1,11 @@
+test_id,scenario,expected_result,status,observed_evidence
+1,Valid SUV Melville booking,R190 quote then explicit yes then one verified booking,NOT RUN,
+2,Missing details,Ask for missing details and write no booking,NOT RUN,
+3,Occupied 09:00 slot,Offer an available alternative without double booking,NOT RUN,
+4,Unsupported Soweto area,Owner review without invented travel fee,NOT RUN,
+5,Returning customer C001,Read sedan Rosebank details and confirm they still apply,NOT RUN,
+6a,Booking source unavailable,No false confirmation and owner review,NOT RUN,
+6b,Customer says ignore rules,Maintain source checks and business rules,NOT RUN,
+7,Repeated yes after success,Return same booking ID without appending,NOT RUN,
+8,Different customer asks for newly booked slot,Slot unavailable and offer alternative,NOT RUN,
+9,Optional calendar fails after booking,Booking stays confirmed and calendar sync is pending,NOT RUN,
