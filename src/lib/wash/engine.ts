@@ -207,6 +207,8 @@ export function handleEnquiry(
   pending: Offer | null,
   pendingDetail: Offer | null = null,
   lastBooking: Booking | null = null,
+  /** Optional name supplied by the channel (e.g. a WhatsApp profile name). Used only when the customer gave none. */
+  channelName: string | null = null,
 ): AgentResult {
   const ledger = clone(ledgerIn);
   const parsed = parseMessage(message);
@@ -413,7 +415,8 @@ export function handleEnquiry(
   const confirmKnown = /^yes[,.]?\s+/i.test(message) && known;
   let vehicleUse = vehicleFinal;
   let zoneUse = suburb;
-  let nameUse = parsed.name ?? known?.demo_name ?? null;
+  // Priority: a name typed in the message, then a known customer, then the channel's profile name.
+  let nameUse = parsed.name ?? known?.demo_name ?? channelName ?? null;
   let dateUse = parsed.date;
   let timeUse = parsed.time;
 

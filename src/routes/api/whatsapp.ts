@@ -33,7 +33,9 @@ export const Route = createFileRoute("/api/whatsapp")({
         const body = String(form.get("Body") ?? "").slice(0, 1000);
         console.log(`[whatsapp] POST ok from …${from.replace(/\D/g, "").slice(-4)} (${body.length} chars)`);
         if (!from || !body.trim()) return twiml("Send me a car wash enquiry, e.g. “SUV wash in Melville Sat 14 Nov at 11”.");
-        const { reply } = processMessage(from, body);
+        // Twilio includes the sender's WhatsApp profile name; use it so we never have to ask for one.
+        const profileName = String(form.get("ProfileName") ?? "").slice(0, 80) || null;
+        const { reply } = processMessage(from, body, profileName);
         return twiml(reply);
       },
       // GET ?key=…&reset=1 clears the demo book between rehearsals; plain GET is a health check.
