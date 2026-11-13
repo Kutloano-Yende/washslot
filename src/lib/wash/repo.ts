@@ -120,26 +120,26 @@ async function makeSqlRepo(): Promise<Repo> {
 
   async function listBusinesses(): Promise<Business[]> {
     let rows = await q<{ doc: Business; key_hash: string; status: "pending" | "approved" }>(
-      "select doc, key_hash, status from businesses order by created_at, id",
+      "select doc, key_hash, status from washslot.businesses order by created_at, id",
     );
     if (!rows.length) {
       for (const b of seedBusinesses()) {
         await q(
-          "insert into businesses (id, doc, key_hash, status) values ($1, $2::jsonb, $3, $4) on conflict (id) do nothing",
+          "insert into washslot.businesses (id, doc, key_hash, status) values ($1, $2::jsonb, $3, $4) on conflict (id) do nothing",
           [b.id, json(strip(b)), b.keyHash, b.status],
         );
       }
-      rows = await q("select doc, key_hash, status from businesses order by created_at, id");
+      rows = await q("select doc, key_hash, status from washslot.businesses order by created_at, id");
     }
     return rows.map(toBusiness);
   }
 
   async function readRow(id: string): Promise<{ doc: Ledger; version: number }> {
-    await q("insert into ledgers (business_id, doc) values ($1, $2::jsonb) on conflict (business_id) do nothing", [
+    await q("insert into washslot.ledgers (business_id, doc) values ($1, $2::jsonb) on conflict (business_id) do nothing", [
       id,
       json(defaultLedger(id)),
     ]);
-    const [row] = await q<{ doc: Ledger; version: number }>("select doc, version from ledgers where business_id = $1", [id]);
+    const [row] = await q<{ doc: Ledger; version: number }>("select doc, version from washslot.ledgers where business_id = $1", [id]);
     return row;
   }
 
@@ -150,7 +150,7 @@ async function makeSqlRepo(): Promise<Repo> {
       return (await listBusinesses()).find((b) => b.id === id);
     },
     async addBusiness(b) {
-      await q("insert into businesses (id, doc, key_hash, status) values ($1, $2::jsonb, $3, $4)", [
+      await q("insert into washslot.businesses (id, doc, key_hash, status) values ($1, $2::jsonb, $3, $4)", [
         b.id,
         json(strip(b)),
         b.keyHash,
@@ -159,7 +159,7 @@ async function makeSqlRepo(): Promise<Repo> {
     },
     async approveBusiness(id) {
       const rows = await q<{ doc: Business; key_hash: string; status: "pending" | "approved" }>(
-        "update businesses set status = 'approved' where id = $1 returning doc, key_hash, status",
+        "update washslot.businesses set status = 'approved' where id = $1 returning doc, key_hash, status",
         [id],
       );
       return rows[0] ? toBusiness(rows[0]) : undefined;
@@ -172,7 +172,7 @@ async function makeSqlRepo(): Promise<Repo> {
         const row = await readRow(id);
         const { ledger, out } = fn(clone(row.doc));
         const done = await q(
-          "update ledgers set doc = $2::jsonb, version = version + 1, updated_at = now() where business_id = $1 and version = $3 returning version",
+          "update washslot.ledgers set doc = $2::jsonb, version = version + 1, updated_at = now() where business_id = $1 and version = $3 returning version",
           [id, json(ledger), row.version],
         );
         if (done.length) return out;
@@ -180,12 +180,12 @@ async function makeSqlRepo(): Promise<Repo> {
       throw new Error("The booking book is busy. Please try again in a moment.");
     },
     async getConvo(hash) {
-      const rows = await q<{ doc: StoredConvo }>("select doc from conversations where sender_hash = $1", [hash]);
+      const rows = await q<{ doc: StoredConvo }>("select doc from washslot.conversations where sender_hash = $1", [hash]);
       return rows[0]?.doc;
     },
     async saveConvo(hash, last4, convo) {
       await q(
-        `insert into conversations (sender_hash, last4, business_id, doc, updated_at)
+        `insert into washslot.conversations (sender_hash, last4, business_id, doc, updated_at)
          values ($1, $2, $3, $4::jsonb, now())
          on conflict (sender_hash) do update set business_id = excluded.business_id, doc = excluded.doc, updated_at = now()`,
         [hash, last4, convo.businessId, json(convo)],
@@ -193,13 +193,13 @@ async function makeSqlRepo(): Promise<Repo> {
     },
     async listConvos(businessId) {
       const rows = await q<{ sender_hash: string; last4: string; doc: StoredConvo }>(
-        "select sender_hash, last4, doc from conversations where business_id is not distinct from $1 order by updated_at desc limit 200",
+        "select sender_hash, last4, doc from washslot.conversations where business_id is not distinct from $1 order by updated_at desc limit 200",
         [businessId],
       );
       return rows.map((r) => ({ hash: r.sender_hash, last4: r.last4, convo: r.doc }));
     },
     async reset() {
-      await q("truncate table ledgers, conversations");
+      await q("truncate table washslot.ledgers, washslot.conversations");
     },
   };
 }
