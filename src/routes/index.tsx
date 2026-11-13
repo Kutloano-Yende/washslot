@@ -33,8 +33,8 @@ const PROMPTS = [
 ];
 
 // ---- Stat cards ----
-// The last point of every line is LIVE (read from the booking book). The six points before it are
-// clearly-labelled SAMPLE history for the fictional business, so the demo can show real ups and downs.
+// Every number comes from the booking book. The lines only show real changes seen since this page was opened
+// (a point is added each time the book changes). Nothing is invented: with no history yet, there is no chart.
 
 type Live = { slots: number; revenue: number; avgTicket: number };
 
@@ -47,12 +47,6 @@ function liveStats(ledger: Ledger): Live {
     avgTicket: confirmed.length ? Math.round(revenue / confirmed.length) : 0,
   };
 }
-
-const SAMPLE_HISTORY = {
-  slots: [1, 2, 3, 2, 4, 3],
-  revenue: [180, 420, 610, 380, 740, 280],
-  avgTicket: [140, 150, 162, 148, 168, 158],
-};
 
 /** Smooth curve through the points (cardinal spline converted to cubic beziers). */
 function smoothPath(pts: [number, number][]): string {
@@ -120,28 +114,35 @@ function StatCard({
   format: (n: number) => string;
 }) {
   const series = [...history, live];
+  const hasHistory = series.length >= 2;
   const prev = series[series.length - 2];
-  const pct = prev ? ((live - prev) / prev) * 100 : 0;
+  const pct = hasHistory && prev ? ((live - prev) / prev) * 100 : 0;
   const up = live >= prev;
   const badge = pct === 0 ? "0%" : `${up ? "▲" : "▼"} ${Math.abs(pct).toFixed(1)}%`;
   return (
     <div className="glass-card flex min-w-0 flex-col gap-1.5 rounded-[var(--radius-card)] p-3 md:p-4">
       <div className="flex items-start justify-between gap-2">
         <p className="truncate text-sm font-semibold text-muted">{label}</p>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
-            pct === 0 ? "bg-[#e3edf2] text-ink" : up ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"
-          }`}
-        >
-          {badge}
-        </span>
+        {hasHistory && (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+              pct === 0 ? "bg-[#e3edf2] text-ink" : up ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"
+            }`}
+          >
+            {badge}
+          </span>
+        )}
       </div>
       <p className="font-display text-2xl leading-none font-semibold md:text-3xl">{value}</p>
-      <TrendChart
-        values={series}
-        up={up}
-        label={`${label}, last 7 days: ${series.map(format).join(", ")}. Today is ${format(live)}.`}
-      />
+      {hasHistory ? (
+        <TrendChart
+          values={series}
+          up={up}
+          label={`${label}, since this page was opened: ${series.map(format).join(", then ")}. Now ${format(live)}.`}
+        />
+      ) : (
+        <p className="text-sm text-muted">No changes yet</p>
+      )}
     </div>
   );
 }
@@ -213,8 +214,19 @@ function Home() {
   }, [ledger]);
 
   const live = useMemo(() => liveStats(ledger), [ledger]);
+  // Real history: one point each time the booking book actually changes while this page is open.
+  const [points, setPoints] = useState<Live[]>([]);
+  useEffect(() => {
+    setPoints((p) => {
+      const last = p[p.length - 1];
+      const same = last && last.slots === live.slots && last.revenue === live.revenue && last.avgTicket === live.avgTicket;
+      return same ? p : [...p, live].slice(-12);
+    });
+  }, [live]);
+  const past = points.slice(0, -1);
 
   function reset() {
+    setPoints([]);
     setLedger(seedLedger());
     setOffer(null);
     setDetail(null);
@@ -280,27 +292,27 @@ function Home() {
           <StatCard
             label="Slots filled"
             value={`${live.slots} / 4`}
-            history={SAMPLE_HISTORY.slots}
+            history={past.map((x) => x.slots)}
             live={live.slots}
             format={(n) => String(n)}
           />
           <StatCard
             label="Revenue booked"
             value={`R${live.revenue}`}
-            history={SAMPLE_HISTORY.revenue}
+            history={past.map((x) => x.revenue)}
             live={live.revenue}
             format={(n) => `R${n}`}
           />
           <StatCard
             label="Average booking"
             value={`R${live.avgTicket}`}
-            history={SAMPLE_HISTORY.avgTicket}
+            history={past.map((x) => x.avgTicket)}
             live={live.avgTicket}
             format={(n) => `R${n}`}
           />
         </div>
         <p className="px-1 text-sm text-muted">
-          Last 7 days: sample data for the fictional business. The final point is today, live from the booking book.
+          Live from the booking book. Charts appear once the book has changed, for example after a booking or a reset.
         </p>
       </section>
 
