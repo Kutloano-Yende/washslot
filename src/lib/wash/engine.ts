@@ -5,6 +5,8 @@ import {
   END_BY_START,
   SERVICES,
   SLOTS,
+  STAFF,
+  WASH_BAY,
   ZONES,
   type Booking,
   type Customer,
@@ -91,13 +93,78 @@ export function isSlot(value: string): value is Slot {
   return (SLOTS as readonly string[]).includes(value);
 }
 
-export function occupied(bookings: Booking[], date: string, slot: string) {
-  return bookings.find(
-    (b) =>
-      b.status === "CONFIRMED" &&
-      b.date_sast === date &&
-      b.start_time_sast === slot,
+function confirmedAt(bookings: Booking[], date: string, slot: string) {
+  return bookings.filter(
+    (b) => b.status === "CONFIRMED" && b.date_sast === date && b.start_time_sast === slot,
   );
+}
+
+/** Employees who work this slot and are not already assigned to a booking in it. */
+export function freeStaff(bookings: Booking[], date: string, slot: string): string[] {
+  const here = confirmedAt(bookings, date, slot);
+  const used = new Set(here.flatMap((b) => b.staff ?? []));
+  // Older rows without named staff are assumed to use two people.
+  const unnamed = here.filter((b) => !b.staff?.length).length * 2;
+  const free = STAFF.filter((s) => (s.slots as readonly string[]).includes(slot) && !used.has(s.name)).map(
+    (s) => s.name,
+  );
+  return free.slice(0, Math.max(0, free.length - unnamed));
+}
+
+/**
+ * The booking that blocks a slot, or undefined while at least two employees are free in it.
+ * Each booking needs two employees, so the owner's staff schedule sets how many cars fit.
+ */
+export function occupied(bookings: Booking[], date: string, slot: string) {
+  if (freeStaff(bookings, date, slot).length >= 2) return undefined;
+  return (
+    confirmedAt(bookings, date, slot)[0] ?? {
+      booking_id: "NO-STAFF",
+      customer_id: "",
+      demo_name: "",
+      service_code: "",
+      suburb: "",
+      date_sast: date,
+      start_time_sast: slot,
+      end_time_sast: "",
+      total_zar: 0,
+      status: "CONFIRMED" as const,
+    }
+  );
+}
+
+/** Pick the two free employees with the lightest day so far (roster order breaks ties). */
+export function assignStaff(bookings: Booking[], date: string, slot: string): [string, string] | null {
+  const free = freeStaff(bookings, date, slot);
+  if (free.length < 2) return null;
+  const load = (name: string) =>
+    bookings.filter((b) => b.status === "CONFIRMED" && b.date_sast === date && b.staff?.includes(name)).length;
+  const ranked = free
+    .map((name, order) => ({ name, order, load: load(name) }))
+    .sort((a, b) => a.load - b.load || a.order - b.order);
+  return [ranked[0].name, ranked[1].name];
+}
+
+/** 1-based place of a booking in that day's running order (by start time). */
+export function queueNumber(bookings: Booking[], booking: Booking): number {
+  const day = bookings
+    .filter((b) => b.status === "CONFIRMED" && b.date_sast === booking.date_sast)
+    .sort((a, b) => a.start_time_sast.localeCompare(b.start_time_sast) || a.booking_id.localeCompare(b.booking_id));
+  return day.findIndex((b) => b.booking_id === booking.booking_id) + 1;
+}
+
+/** The ticket the client receives once staff are assigned. */
+export function ticketFor(booking: Booking): string {
+  const [a, b] = booking.staff ?? [];
+  const where =
+    booking.suburb === WASH_BAY
+      ? "Please bring your car to our wash bay and arrive on time."
+      : `Our crew will come to you in ${booking.suburb}; please be ready on time.`;
+  return `Your car is number ${booking.queue_number} on ${dayName(booking.date_sast)}. ${a} and ${b} will be responsible for it. ${where} Your schedule is booked.`;
+}
+
+function dayName(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-ZA", { weekday: "long", timeZone: "UTC" });
 }
 
 function weekdayOk(iso: string): boolean {
@@ -132,6 +199,11 @@ function parseVehicle(text: string): "sedan" | "suv" | null {
 
 function parseSuburb(text: string): { known: Zone | null; mentioned: string | null } {
   const lower = text.toLowerCase();
+  // Clients can bring the car to the wash instead of asking the crew to travel.
+  if (/\b(wash ?bay|drop[- ]?off|bring (it|my car|the car|him|her)|i['’]?ll bring|i will bring|come to you|at your (place|wash|premises))\b/.test(lower)) {
+    const bay = ZONES.find((z) => z.suburb === WASH_BAY);
+    if (bay) return { known: bay, mentioned: bay.suburb };
+  }
   for (const zone of ZONES) {
     if (lower.includes(zone.suburb.toLowerCase())) return { known: zone, mentioned: zone.suburb };
   }
@@ -431,7 +503,7 @@ export function handleEnquiry(
 
   const missing: string[] = [];
   if (!vehicleUse) missing.push("vehicle type (sedan or SUV)");
-  if (!zoneUse) missing.push("suburb");
+  if (!zoneUse) missing.push("suburb (or say you will bring the car to our wash bay)");
   if (!dateUse) missing.push("date");
   if (!timeUse) missing.push("time (09:00, 11:00, 13:00, or 15:00)");
   if (!nameUse && !known) missing.push("a demo name");
@@ -621,6 +693,21 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
     checks.push(`Reused customer ${customer.customer_id}.`);
   }
 
+  const staff = assignStaff(ledger.bookings, pending.date_sast, pending.start_time_sast);
+  if (!staff) {
+    return pack({
+      request_summary: "No two employees are free for that slot.",
+      source_checks: checks,
+      price_breakdown: null,
+      status: "PENDING OWNER REVIEW",
+      customer_draft: "I could not assign two employees to that slot, so I am not confirming it.",
+      owner_note: "PENDING OWNER REVIEW. Fewer than two employees free. No row written.",
+      offer: pending,
+      booking: null,
+      ledger,
+    });
+  }
+
   const booking: Booking = {
     booking_id: nextId(
       ledger.bookings.map((b) => b.booking_id),
@@ -635,15 +722,21 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
     end_time_sast: pending.end_time_sast,
     total_zar: pending.total_zar,
     status: "CONFIRMED",
+    staff: [...staff],
   };
   ledger.bookings.push(booking);
-  const verified = ledger.bookings.filter(
+  booking.queue_number = queueNumber(ledger.bookings, booking);
+  // Verify: the row exists once, and neither employee is also on another job in this slot.
+  const sameId = ledger.bookings.filter((b) => b.booking_id === booking.booking_id).length === 1;
+  const doubleBooked = ledger.bookings.some(
     (b) =>
+      b.booking_id !== booking.booking_id &&
+      b.status === "CONFIRMED" &&
       b.date_sast === booking.date_sast &&
       b.start_time_sast === booking.start_time_sast &&
-      b.status === "CONFIRMED",
+      b.staff?.some((n) => staff.includes(n)),
   );
-  if (verified.length !== 1 || verified[0].booking_id !== booking.booking_id) {
+  if (!sameId || doubleBooked) {
     ledger.bookings = ledger.bookings.filter((b) => b.booking_id !== booking.booking_id);
     return pack({
       request_summary: "Write could not be verified.",
@@ -659,7 +752,7 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
   }
 
   checks.push(
-    `Bookings append ${booking.booking_id} re-read. Exactly one CONFIRMED row for ${booking.date_sast} ${booking.start_time_sast}.`,
+    `Bookings append ${booking.booking_id} re-read. ${staff[0]} and ${staff[1]} were free for ${booking.date_sast} ${booking.start_time_sast} and are assigned; no employee is double-booked.`,
     "No calendar is connected. Nothing to sync.",
   );
 
@@ -668,8 +761,8 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
     source_checks: checks,
     price_breakdown: `${money(pending.base_price_zar)} + ${money(pending.travel_fee_zar)} = ${money(booking.total_zar)}.`,
     status: "CONFIRMED",
-    customer_draft: `Booked ${booking.booking_id}: ${pending.service.service_name}, ${pending.vehicle_type}, ${booking.suburb}, ${booking.date_sast} ${booking.start_time_sast}–${booking.end_time_sast}. Total ${money(booking.total_zar)}. This chat is the only message — nothing was sent outside it.`,
-    owner_note: `Verified ${booking.booking_id}, customer ${booking.customer_id}. Calendar not connected, so no CALENDAR SYNC step. Do not append again.`,
+    customer_draft: `Booked ${booking.booking_id}: ${pending.service.service_name}, ${pending.vehicle_type}, ${booking.suburb}, ${booking.date_sast} ${booking.start_time_sast}–${booking.end_time_sast}. Total ${money(booking.total_zar)}. ${ticketFor(booking)}`,
+    owner_note: `Verified ${booking.booking_id}, customer ${booking.customer_id}. Assigned ${staff[0]} and ${staff[1]}, queue number ${booking.queue_number}. Calendar not connected, so no CALENDAR SYNC step. Do not append again.`,
     offer: null,
     booking,
     ledger,

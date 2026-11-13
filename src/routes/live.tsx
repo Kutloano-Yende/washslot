@@ -14,6 +14,7 @@ type State = {
     start_time_sast: string;
     total_zar: number;
     status: string;
+    staff?: string[];
   }[];
   conversations: { sender: string; thread: Msg[] }[];
 };
@@ -167,13 +168,20 @@ function Live() {
             <h2 className="font-display text-xl">14 November 2026</h2>
             <ul className="mt-3 grid grid-cols-2 gap-3">
               {SLOTS.map((time) => {
-                const hit = confirmed.find((b) => b.date_sast === "2026-11-14" && b.start_time_sast === time);
+                const hits = confirmed.filter((b) => b.date_sast === "2026-11-14" && b.start_time_sast === time);
                 return (
-                  <li key={time} className={`slot-tile ${hit ? "slot-booked" : "slot-free"}`}>
+                  <li key={time} className={`slot-tile ${hits.length ? "slot-booked" : "slot-free"}`}>
                     <span className="relative text-lg font-bold">{time}</span>
-                    <span className="relative text-sm font-semibold">
-                      {hit ? `${hit.booking_id} · ${hit.suburb}` : "Free"}
-                    </span>
+                    {hits.length ? (
+                      hits.map((h) => (
+                        <span key={h.booking_id} className="relative text-sm font-semibold">
+                          {h.booking_id} · {h.suburb}
+                          {h.staff?.length ? ` · ${h.staff.join(" + ")}` : ""}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="relative text-sm font-semibold">Free</span>
+                    )}
                   </li>
                 );
               })}
@@ -182,12 +190,15 @@ function Live() {
           <div className="glass-card rounded-[var(--radius-card)] p-4 text-sm">
             <h2 className="font-display text-xl">Book</h2>
             <ul className="mt-2 flex flex-col gap-2">
-              {(state?.bookings ?? []).map((b) => (
-                <li key={b.booking_id}>
-                  <span className="font-semibold">{b.booking_id}</span> {b.demo_name} · {b.suburb} · {b.date_sast}{" "}
-                  {b.start_time_sast} · R{b.total_zar}
-                </li>
-              ))}
+              {[...(state?.bookings ?? [])]
+                .sort((a, b) => a.date_sast.localeCompare(b.date_sast) || a.start_time_sast.localeCompare(b.start_time_sast))
+                .map((b, i) => (
+                  <li key={b.booking_id}>
+                    <span className="font-semibold">#{i + 1} {b.booking_id}</span> {b.demo_name} · {b.suburb} ·{" "}
+                    {b.date_sast} {b.start_time_sast} · R{b.total_zar}
+                    {b.staff?.length ? ` · ${b.staff.join(" + ")}` : ""}
+                  </li>
+                ))}
             </ul>
           </div>
         </aside>

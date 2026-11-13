@@ -31,6 +31,10 @@ export type Booking = {
   end_time_sast: string;
   total_zar: number;
   status: "CONFIRMED";
+  /** The two employees responsible for this job. Set when the booking is confirmed. */
+  staff?: string[];
+  /** Position of this job in that day's running order (by start time) when it was confirmed. */
+  queue_number?: number;
 };
 
 export const SERVICES: Service[] = [
@@ -50,11 +54,15 @@ export const SERVICES: Service[] = [
   },
 ];
 
+export const WASH_BAY = "our wash bay";
+
 export const ZONES: Zone[] = [
   { suburb: "Rosebank", travel_fee_zar: 0, served: true },
   { suburb: "Parkwood", travel_fee_zar: 0, served: true },
   { suburb: "Parkhurst", travel_fee_zar: 20, served: true },
   { suburb: "Melville", travel_fee_zar: 30, served: true },
+  // Client brings the car to the wash: no travel. Matched by phrases such as "I'll bring it".
+  { suburb: WASH_BAY, travel_fee_zar: 0, served: true },
 ];
 
 export const CUSTOMERS: Customer[] = [
@@ -86,6 +94,8 @@ export const BOOKINGS: Booking[] = [
     end_time_sast: "10:30",
     total_zar: 120,
     status: "CONFIRMED",
+    staff: ["Kamo", "Lovely"],
+    queue_number: 1,
   },
   {
     booking_id: "B002",
@@ -98,6 +108,8 @@ export const BOOKINGS: Booking[] = [
     end_time_sast: "16:30",
     total_zar: 190,
     status: "CONFIRMED",
+    staff: ["Sipho", "Zanele"],
+    queue_number: 2,
   },
 ];
 
@@ -111,3 +123,17 @@ export const END_BY_START: Record<Slot, string> = {
   "13:00": "14:30",
   "15:00": "16:30",
 };
+
+/**
+ * The owner's team and the slots each person works (Monday to Saturday).
+ * A slot can be booked while at least two employees are free in it; each booking uses two.
+ * Replace these names and shifts with the real team.
+ */
+export type Staff = { name: string; slots: readonly Slot[] };
+
+export const STAFF: Staff[] = [
+  { name: "Kamo", slots: SLOTS },
+  { name: "Lovely", slots: SLOTS },
+  { name: "Sipho", slots: ["13:00", "15:00"] },
+  { name: "Zanele", slots: ["13:00", "15:00"] },
+];

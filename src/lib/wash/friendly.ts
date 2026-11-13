@@ -43,7 +43,9 @@ export function friendlyReply({ message, draft, name }: FriendlyInput): string {
       .split(/,\s*(?![^()]*\))/)
       .map((i) => i.trim())
       .map((i) => (i === "a demo name" ? "your name" : i))
-      .map((i) => (i === "suburb" ? `suburb (we cover ${AREAS})` : i));
+      .map((i) =>
+        i.startsWith("suburb") ? `suburb (we cover ${AREAS}), or say you’ll bring the car to our wash bay` : i,
+      );
     const greeted = GREETING.test(message);
     const opener = greeted
       ? `Hey${comma(name)}! 👋 I'm ${BOT_NAME}, Demo Wash Co's booking assistant. Let's get your car sparkling ✨`

@@ -474,6 +474,7 @@ function Home() {
                 <li key={b.booking_id}>
                   <span className="font-semibold">{b.booking_id}</span> {b.demo_name} · {b.suburb} ·{" "}
                   {b.date_sast} {b.start_time_sast} · R{b.total_zar}
+                  {b.staff?.length ? ` · ${b.staff.join(" + ")}` : ""}
                 </li>
               ))}
             </ul>
