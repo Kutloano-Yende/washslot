@@ -5,6 +5,7 @@ import {
   END_BY_START,
   SERVICES,
   SLOTS,
+  BRANCHES,
   STAFF,
   WASH_BAY,
   ZONES,
@@ -153,12 +154,23 @@ export function queueNumber(bookings: Booking[], booking: Booking): number {
   return day.findIndex((b) => b.booking_id === booking.booking_id) + 1;
 }
 
+/** Nearest branch for a client's suburb; the first branch when the suburb is unknown. */
+export function pickBranch(suburb: string | undefined) {
+  return BRANCHES.find((b) => suburb && b.serves.includes(suburb)) ?? BRANCHES[0];
+}
+
+/** Free Google Maps directions link: opens navigation from the client's current location. */
+export function directionsLink(address: string): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
+}
+
 /** The ticket the client receives once staff are assigned. */
 export function ticketFor(booking: Booking): string {
   const [a, b] = booking.staff ?? [];
+  const branch = BRANCHES.find((x) => x.name === booking.branch) ?? pickBranch(undefined);
   const where =
     booking.suburb === WASH_BAY
-      ? "Please bring your car to our wash bay and arrive on time."
+      ? `Please bring your car to ${branch.name} (${branch.address.replace(", South Africa", "")}) and arrive on time. Directions from where you are: ${directionsLink(branch.address)}`
       : `Our crew will come to you in ${booking.suburb}; please be ready on time.`;
   return `Your car is number ${booking.queue_number} on ${dayName(booking.date_sast)}. ${a} and ${b} will be responsible for it. ${where} Your schedule is booked.`;
 }
@@ -723,6 +735,7 @@ function confirmOffer(ledger: Ledger, pending: Offer, checks: string[]): AgentRe
     total_zar: pending.total_zar,
     status: "CONFIRMED",
     staff: [...staff],
+    ...(pending.zone.suburb === WASH_BAY ? { branch: pickBranch(customer.suburb).name } : {}),
   };
   ledger.bookings.push(booking);
   booking.queue_number = queueNumber(ledger.bookings, booking);

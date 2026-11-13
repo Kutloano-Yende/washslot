@@ -35,6 +35,8 @@ export type Booking = {
   staff?: string[];
   /** Position of this job in that day's running order (by start time) when it was confirmed. */
   queue_number?: number;
+  /** Which wash the client was sent to, when they bring the car (see BRANCHES). */
+  branch?: string;
 };
 
 export const SERVICES: Service[] = [
@@ -136,4 +138,16 @@ export const STAFF: Staff[] = [
   { name: "Lovely", slots: SLOTS },
   { name: "Sipho", slots: ["13:00", "15:00"] },
   { name: "Zanele", slots: ["13:00", "15:00"] },
+];
+
+/**
+ * Where clients bring their cars. The nearest branch is chosen from the client's suburb and
+ * the ticket carries a free Google Maps directions link to it (no API key needed).
+ * Placeholder: replace names and addresses with the owner's real wash locations.
+ */
+export type Branch = { name: string; address: string; serves: string[] };
+
+export const BRANCHES: Branch[] = [
+  { name: "Demo Wash Co. Rosebank", address: "Rosebank, Johannesburg, South Africa", serves: ["Rosebank", "Parkwood", "Parkhurst"] },
+  { name: "Demo Wash Co. Melville", address: "Melville, Johannesburg, South Africa", serves: ["Melville"] },
 ];
