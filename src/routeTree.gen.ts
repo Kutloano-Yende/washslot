@@ -11,9 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LiveRouteImport } from './routes/live'
+import { Route as OwnerRouteImport } from './routes/owner'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ApiLiveStateRouteImport } from './routes/api/live-state'
+import { Route as ApiOwnerStateRouteImport } from './routes/api/owner-state'
+import { Route as ApiPlatformRouteImport } from './routes/api/platform'
+import { Route as ApiRegisterRouteImport } from './routes/api/register'
 import { Route as ApiSimulateRouteImport } from './routes/api/simulate'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
+import { Route as ApiAdminApproveRouteImport } from './routes/api/admin/approve'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,9 +31,34 @@ const LiveRoute = LiveRouteImport.update({
   path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OwnerRoute = OwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLiveStateRoute = ApiLiveStateRouteImport.update({
   id: '/api/live-state',
   path: '/api/live-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerStateRoute = ApiOwnerStateRouteImport.update({
+  id: '/api/owner-state',
+  path: '/api/owner-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlatformRoute = ApiPlatformRouteImport.update({
+  id: '/api/platform',
+  path: '/api/platform',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRegisterRoute = ApiRegisterRouteImport.update({
+  id: '/api/register',
+  path: '/api/register',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSimulateRoute = ApiSimulateRouteImport.update({
@@ -40,50 +71,106 @@ const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
   path: '/api/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminApproveRoute = ApiAdminApproveRouteImport.update({
+  id: '/api/admin/approve',
+  path: '/api/admin/approve',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/live': typeof LiveRoute
+  '/owner': typeof OwnerRoute
+  '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-state': typeof ApiOwnerStateRoute
+  '/api/platform': typeof ApiPlatformRoute
+  '/api/register': typeof ApiRegisterRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/api/admin/approve': typeof ApiAdminApproveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/live': typeof LiveRoute
+  '/owner': typeof OwnerRoute
+  '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-state': typeof ApiOwnerStateRoute
+  '/api/platform': typeof ApiPlatformRoute
+  '/api/register': typeof ApiRegisterRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/api/admin/approve': typeof ApiAdminApproveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/live': typeof LiveRoute
+  '/owner': typeof OwnerRoute
+  '/register': typeof RegisterRoute
   '/api/live-state': typeof ApiLiveStateRoute
+  '/api/owner-state': typeof ApiOwnerStateRoute
+  '/api/platform': typeof ApiPlatformRoute
+  '/api/register': typeof ApiRegisterRoute
   '/api/simulate': typeof ApiSimulateRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
+  '/api/admin/approve': typeof ApiAdminApproveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/live' | '/api/live-state' | '/api/simulate' | '/api/whatsapp'
+    | '/'
+    | '/live'
+    | '/owner'
+    | '/register'
+    | '/api/live-state'
+    | '/api/owner-state'
+    | '/api/platform'
+    | '/api/register'
+    | '/api/simulate'
+    | '/api/whatsapp'
+    | '/api/admin/approve'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/live' | '/api/live-state' | '/api/simulate' | '/api/whatsapp'
+  to:
+    | '/'
+    | '/live'
+    | '/owner'
+    | '/register'
+    | '/api/live-state'
+    | '/api/owner-state'
+    | '/api/platform'
+    | '/api/register'
+    | '/api/simulate'
+    | '/api/whatsapp'
+    | '/api/admin/approve'
   id:
     | '__root__'
     | '/'
     | '/live'
+    | '/owner'
+    | '/register'
     | '/api/live-state'
+    | '/api/owner-state'
+    | '/api/platform'
+    | '/api/register'
     | '/api/simulate'
     | '/api/whatsapp'
+    | '/api/admin/approve'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LiveRoute: typeof LiveRoute
+  OwnerRoute: typeof OwnerRoute
+  RegisterRoute: typeof RegisterRoute
   ApiLiveStateRoute: typeof ApiLiveStateRoute
+  ApiOwnerStateRoute: typeof ApiOwnerStateRoute
+  ApiPlatformRoute: typeof ApiPlatformRoute
+  ApiRegisterRoute: typeof ApiRegisterRoute
   ApiSimulateRoute: typeof ApiSimulateRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
+  ApiAdminApproveRoute: typeof ApiAdminApproveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -102,11 +189,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/owner': {
+      id: '/owner'
+      path: '/owner'
+      fullPath: '/owner'
+      preLoaderRoute: typeof OwnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/live-state': {
       id: '/api/live-state'
       path: '/api/live-state'
       fullPath: '/api/live-state'
       preLoaderRoute: typeof ApiLiveStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-state': {
+      id: '/api/owner-state'
+      path: '/api/owner-state'
+      fullPath: '/api/owner-state'
+      preLoaderRoute: typeof ApiOwnerStateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/platform': {
+      id: '/api/platform'
+      path: '/api/platform'
+      fullPath: '/api/platform'
+      preLoaderRoute: typeof ApiPlatformRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/register': {
+      id: '/api/register'
+      path: '/api/register'
+      fullPath: '/api/register'
+      preLoaderRoute: typeof ApiRegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/simulate': {
@@ -123,15 +245,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/approve': {
+      id: '/api/admin/approve'
+      path: '/api/admin/approve'
+      fullPath: '/api/admin/approve'
+      preLoaderRoute: typeof ApiAdminApproveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LiveRoute: LiveRoute,
+  OwnerRoute: OwnerRoute,
+  RegisterRoute: RegisterRoute,
   ApiLiveStateRoute: ApiLiveStateRoute,
+  ApiOwnerStateRoute: ApiOwnerStateRoute,
+  ApiPlatformRoute: ApiPlatformRoute,
+  ApiRegisterRoute: ApiRegisterRoute,
   ApiSimulateRoute: ApiSimulateRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,
+  ApiAdminApproveRoute: ApiAdminApproveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

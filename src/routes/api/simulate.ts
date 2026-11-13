@@ -19,11 +19,20 @@ export const Route = createFileRoute("/api/simulate")({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         if (!isLocal(request)) return new Response("Forbidden", { status: 403 });
-        const data = (await request.json().catch(() => ({}))) as { customer?: string; body?: string };
+        const data = (await request.json().catch(() => ({}))) as {
+          customer?: string;
+          body?: string;
+          lat?: number;
+          lng?: number;
+        };
         const from = CUSTOMERS[data.customer ?? "a"] ?? CUSTOMERS.a;
         const body = String(data.body ?? "").slice(0, 1000).trim();
-        if (!body) return Response.json({ ok: false }, { status: 400 });
-        const { reply } = processMessage(from, body);
+        const pin =
+          Number.isFinite(data.lat) && Number.isFinite(data.lng) && Math.abs(data.lat!) <= 90 && Math.abs(data.lng!) <= 180
+            ? { lat: data.lat!, lng: data.lng! }
+            : null;
+        if (!body && !pin) return Response.json({ ok: false }, { status: 400 });
+        const { reply } = processMessage(from, body, null, pin);
         return Response.json({ ok: true, reply });
       },
     },

@@ -70,6 +70,11 @@ function clone(ledger: Ledger): Ledger {
   };
 }
 
+/** A new business starts with no customers and no bookings. */
+export function emptyLedger(): Ledger {
+  return { bookingsReadable: true, customers: [], bookings: [] };
+}
+
 export function seedLedger(): Ledger {
   return {
     bookingsReadable: true,
@@ -160,8 +165,9 @@ export function pickBranch(suburb: string | undefined) {
 }
 
 /** Free Google Maps directions link: opens navigation from the client's current location. */
-export function directionsLink(address: string): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
+export function directionsLink(address: string, at?: { lat?: number; lng?: number }): string {
+  const dest = at?.lat !== undefined && at?.lng !== undefined ? `${at.lat},${at.lng}` : address;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=driving`;
 }
 
 /** The ticket the client receives once staff are assigned. */
@@ -172,7 +178,7 @@ export function ticketFor(booking: Booking): string {
   const place = booking.address ? `${booking.address}, ${booking.suburb}` : booking.suburb;
   const where =
     mode === "bring"
-      ? `Please bring your car to ${branch.name} (${branch.address.replace(", South Africa", "")}) and arrive on time. Directions from where you are: ${directionsLink(branch.address)}`
+      ? `Please bring your car to ${branch.name} (${branch.address.replace(", South Africa", "")}) and arrive on time. Directions from where you are: ${directionsLink(branch.address, branch)}`
       : mode === "collect"
         ? `Our team will collect your car from ${place} and bring it back when it is done; please have it ready on time.`
         : `Our crew will come to you at ${place}; please be ready on time.`;

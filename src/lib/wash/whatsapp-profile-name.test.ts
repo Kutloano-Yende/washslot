@@ -15,8 +15,10 @@ test("cleanProfileName keeps a safe first name only", () => {
 
 test("the bot asks for the client's name instead of trusting the WhatsApp profile name", () => {
   resetStore();
-  const r = processMessage("whatsapp:+27000000002", "SUV wash in Melville Sat 14 Nov at 11", "Agent");
-  assert.equal(r.result, null);
+  const from = "whatsapp:+27000000002";
+  processMessage(from, "Hi", "Agent");
+  processMessage(from, "Rosebank", "Agent");
+  const r = processMessage(from, "1", "Agent");
   assert.match(r.reply, /your name/i);
   assert.doesNotMatch(r.reply, /Agent/);
 });

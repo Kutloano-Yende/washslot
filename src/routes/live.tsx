@@ -21,6 +21,12 @@ type State = {
 
 const SLOTS = ["09:00", "11:00", "13:00", "15:00"];
 
+const PINS = [
+  { label: "📍 Pin: Melville", lat: -26.1818, lng: 28.007 },
+  { label: "📍 Pin: Rosebank", lat: -26.1467, lng: 28.0436 },
+  { label: "📍 Pin: Sandton", lat: -26.1076, lng: 28.0567 },
+];
+
 const SAMPLES = [
   {
     label: "Valid SUV booking",
@@ -79,7 +85,10 @@ function Live() {
         </p>
         <h1 className="relative font-display text-4xl font-semibold text-white md:text-5xl">WashSlot Live</h1>
         <p className="relative mt-1 text-[#e3fbff]">
-          Message the WashSlot WhatsApp number. Replies and bookings appear here as they happen.
+          Message the WashSlot WhatsApp number. Replies and bookings appear here as they happen.{" "}
+          <a className="font-semibold underline" href="/owner?biz=demo-wash-co&key=demo">Owner dashboard</a>
+          {" · "}
+          <a className="font-semibold underline" href="/register">Register a car wash</a>
           {error && " (reconnecting…)"}
         </p>
       </header>
@@ -149,6 +158,22 @@ function Live() {
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
+              {PINS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={async () => {
+                    await fetch("/api/simulate", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ customer, body: "", lat: p.lat, lng: p.lng }),
+                    });
+                  }}
+                  className="min-h-11 rounded-full border border-accent bg-cyan-soft px-3 text-xs font-semibold text-accent-deep hover:bg-cyan"
+                >
+                  {p.label}
+                </button>
+              ))}
               {SAMPLES.map((s) => (
                 <button
                   key={s.label}

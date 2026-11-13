@@ -18,6 +18,7 @@ import {
   type Offer,
   type Status,
 } from "./engine.ts";
+import { DEMO_ID, byText, getBusiness, nearest, type Nearby } from "./businesses.ts";
 import { friendlyReply } from "./friendly.ts";
 import { SLOTS, WASH_BAY, ZONES, type Slot } from "./seeds.ts";
 
@@ -46,6 +47,12 @@ export type IntakeState = {
   offer: Offer | null;
   detail: Offer | null;
   lastBooking: Booking | null;
+  /** The car wash this client is booking with; null until they pick one from the registered businesses. */
+  businessId: string | null;
+  /** Business ids we just listed, in order, so "2" means the second one. */
+  choices: string[];
+  /** The assistant has already introduced itself in this conversation. */
+  introduced?: boolean;
 };
 
 export const BOT = "Wash Buddy";
@@ -56,7 +63,10 @@ export const emptyDraft = (): Draft => ({
   name: null, mode: null, suburb: null, place: null, vehicle: null, make: null,
   date: null, time: null, scent: null, allergies: null, awaiting: null,
 });
-export const emptyState = (): IntakeState => ({ draft: emptyDraft(), offer: null, detail: null, lastBooking: null });
+/** `businessId` defaults to the sample business (single-business mode); the store passes null to start with the nearest-wash question. */
+export const emptyState = (businessId: string | null = DEMO_ID): IntakeState => ({
+  draft: emptyDraft(), offer: null, detail: null, lastBooking: null, businessId, choices: [],
+});
 
 // ---------- parsing helpers ----------
 
@@ -280,12 +290,15 @@ export function converse(
   ledger: Ledger,
   stateIn: IntakeState,
   message: string,
-  opts: { profileName?: string | null; today?: string } = {},
+  opts: { profileName?: string | null; today?: string; location?: { lat: number; lng: number } | null } = {},
 ): ConverseResult {
   const today = opts.today ?? todayISO();
   const state: IntakeState = { ...stateIn, draft: { ...stateIn.draft } };
   const d = state.draft;
   const text = message.trim();
+
+  // 0. Several car washes are registered: find the client's nearest one first.
+  if (!state.businessId && !HOSTILE.test(text)) return chooseBusiness(ledger, state, text, opts.location ?? null);
 
   // 1. Things the engine already handles well: a pending offer, a repeated yes, a customer ID, tampering.
   const hostile = HOSTILE.test(text);
@@ -368,7 +381,7 @@ export function converse(
   const nameHello = d.name && !was.name ? `Nice to meet you, ${d.name}! 👋\n\n` : "";
   const greeted = GREETING.test(text) && !d.name;
   const intro = greeted || ASKS_WHO.test(text)
-    ? `${greeted ? "Hey! 👋 " : ""}I'm ${BOT} 🧽, Demo Wash Co's booking assistant (I'm a bot, but a friendly one!). Let's get your car sparkling ✨\n\n`
+    ? `${greeted ? "Hey! 👋 " : ""}I'm ${BOT} 🧽, ${getBusiness(state.businessId)?.name ?? "WashSlot"}'s booking assistant (I'm a bot, but a friendly one!). Let's get your car sparkling ✨\n\n`
     : "";
 
   let notice = "";
@@ -466,3 +479,55 @@ function viaEngine(ledger: Ledger, state: IntakeState, text: string, profileName
   return { reply, state, ledger: r.ledger, status: r.status, result: r };
 }
 
+
+const NUMBER_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+
+function listBusinesses(state: IntakeState, found: (Nearby | (ReturnType<typeof byText>[number] & { km?: number }))[], lead: string): string {
+  state.choices = found.map((b) => b.id);
+  const lines = found.map(
+    (b, i) => `${NUMBER_EMOJI[i]} ${b.name} · ${b.address.split(",")[0]}${"km" in b && b.km !== undefined ? ` · ${b.km.toFixed(1)} km away` : ""}`,
+  );
+  return `${lead}\n\n${lines.join("\n")}\n\nReply with a number to choose, or send a different location pin 📍`;
+}
+
+/** First step when more than one car wash is registered: location pin, suburb or number. */
+function chooseBusiness(
+  ledger: Ledger,
+  state: IntakeState,
+  text: string,
+  loc: { lat: number; lng: number } | null,
+): ConverseResult {
+  const greeted = GREETING.test(text);
+  const hi = state.introduced
+    ? ""
+    : `${greeted ? "Hey! 👋 " : ""}I'm ${BOT} 🧽 from WashSlot. I find a car wash near you and book it for you.\n\n`;
+  state.introduced = true;
+
+  const pick = state.choices.length ? text.trim().match(/^([1-9])\b/) : null;
+  let chosen = pick ? getBusiness(state.choices[+pick[1] - 1]) : undefined;
+  if (!chosen && state.choices.length) {
+    chosen = state.choices.map((id) => getBusiness(id)).find((b) => b && text.toLowerCase().includes(b.name.toLowerCase()));
+  }
+  if (chosen) {
+    state.businessId = chosen.id;
+    state.choices = [];
+    state.draft.awaiting = "name";
+    return out(
+      state, ledger,
+      `Great choice! 🙌 ${chosen.name} (${chosen.address}). I'll take your booking for them.\n\n${question("name", state.draft, ledger)}`,
+    );
+  }
+  if (loc) {
+    const found = nearest(loc.lat, loc.lng, 3);
+    if (found.length) return out(state, ledger, listBusinesses(state, found, `${hi}Thanks for the pin 📍 These are the car washes closest to you:`));
+  }
+  const area = text.replace(GREETING, "").trim();
+  if (/[a-z]{4}/i.test(area)) {
+    const found = byText(area, 3);
+    return out(state, ledger, listBusinesses(state, found, `${hi}Here are the car washes registered with us:`));
+  }
+  return out(
+    state, ledger,
+    `${hi}Please share your location pin 📍 (tap the + or paperclip, then Location) and I'll show you the nearest washes. Or just type your suburb.`,
+  );
+}

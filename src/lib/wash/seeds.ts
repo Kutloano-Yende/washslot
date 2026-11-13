@@ -47,7 +47,7 @@ export type Booking = {
   allergies?: string;
 };
 
-export const SERVICES: Service[] = [
+export let SERVICES: Service[] = [
   {
     service_code: "WASH_SEDAN",
     vehicle_type: "sedan",
@@ -66,7 +66,7 @@ export const SERVICES: Service[] = [
 
 export const WASH_BAY = "our wash bay";
 
-export const ZONES: Zone[] = [
+export let ZONES: Zone[] = [
   { suburb: "Rosebank", travel_fee_zar: 0, served: true },
   { suburb: "Parkwood", travel_fee_zar: 0, served: true },
   { suburb: "Parkhurst", travel_fee_zar: 20, served: true },
@@ -141,7 +141,7 @@ export const END_BY_START: Record<Slot, string> = {
  */
 export type Staff = { name: string; slots: readonly Slot[] };
 
-export const STAFF: Staff[] = [
+export let STAFF: Staff[] = [
   { name: "Kamo", slots: SLOTS },
   { name: "Lovely", slots: SLOTS },
   { name: "Sipho", slots: ["13:00", "15:00"] },
@@ -153,9 +153,47 @@ export const STAFF: Staff[] = [
  * the ticket carries a free Google Maps directions link to it (no API key needed).
  * Placeholder: replace names and addresses with the owner's real wash locations.
  */
-export type Branch = { name: string; address: string; serves: string[] };
+export type Branch = { name: string; address: string; serves: string[]; lat?: number; lng?: number };
 
-export const BRANCHES: Branch[] = [
-  { name: "Demo Wash Co. Rosebank", address: "Rosebank, Johannesburg, South Africa", serves: ["Rosebank", "Parkwood", "Parkhurst"] },
-  { name: "Demo Wash Co. Melville", address: "Melville, Johannesburg, South Africa", serves: ["Melville"] },
+export let BRANCHES: Branch[] = [
+  { name: "Demo Wash Co. Rosebank", address: "Rosebank, Johannesburg, South Africa", serves: ["Rosebank", "Parkwood", "Parkhurst"], lat: -26.1467, lng: 28.0436 },
+  { name: "Demo Wash Co. Melville", address: "Melville, Johannesburg, South Africa", serves: ["Melville"], lat: -26.1818, lng: 28.007 },
 ];
+
+/**
+ * One car wash business on the platform. Prices, travel areas, team and branches are per business; the
+ * engine reads them through the live bindings above, so activate() switches every function at once.
+ */
+export type Business = {
+  id: string;
+  name: string;
+  ownerName: string;
+  phone: string;
+  address: string;
+  lat: number;
+  lng: number;
+  services: Service[];
+  zones: Zone[];
+  staff: Staff[];
+  branches: Branch[];
+  /** Secret that opens this business's dashboard. */
+  key: string;
+  /** Only approved businesses are shown to clients. */
+  status: "pending" | "approved";
+  /** True for built-in sample businesses, so they are never mistaken for real sign-ups. */
+  example?: boolean;
+  createdAt: string;
+};
+
+export type BusinessConfig = Pick<Business, "services" | "zones" | "staff" | "branches">;
+
+/** The original single demo business, captured before any switching happens. */
+export const DEMO_CONFIG: BusinessConfig = { services: SERVICES, zones: ZONES, staff: STAFF, branches: BRANCHES };
+
+/** Point the engine at one business's prices, areas, team and branches. */
+export function activate(c: BusinessConfig): void {
+  SERVICES = c.services;
+  ZONES = c.zones;
+  STAFF = c.staff;
+  BRANCHES = c.branches;
+}

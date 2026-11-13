@@ -31,11 +31,15 @@ export const Route = createFileRoute("/api/whatsapp")({
         const form = await request.formData();
         const from = String(form.get("From") ?? "").slice(0, 64);
         const body = String(form.get("Body") ?? "").slice(0, 1000);
-        console.log(`[whatsapp] POST ok from …${from.replace(/\D/g, "").slice(-4)} (${body.length} chars)`);
-        if (!from || !body.trim()) return twiml("Send me a car wash enquiry, e.g. “SUV wash in Melville Sat 14 Nov at 11”.");
-        // Twilio includes the sender's WhatsApp profile name; use it so we never have to ask for one.
+        // A WhatsApp location pin arrives as Latitude/Longitude (and an empty Body).
+        const lat = Number(form.get("Latitude"));
+        const lng = Number(form.get("Longitude"));
+        const pin = form.get("Latitude") && form.get("Longitude") && Number.isFinite(lat) && Number.isFinite(lng) &&
+          Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+        console.log(`[whatsapp] POST ok from …${from.replace(/\D/g, "").slice(-4)} (${body.length} chars${pin ? ", location pin" : ""})`);
+        if (!from || (!body.trim() && !pin)) return twiml("Hi! Share your location pin 📍 or tell me what you need, and I'll find you a car wash.");
         const profileName = String(form.get("ProfileName") ?? "").slice(0, 80) || null;
-        const { reply } = processMessage(from, body, profileName);
+        const { reply } = processMessage(from, body, profileName, pin);
         return twiml(reply);
       },
       // GET ?key=…&reset=1 clears the demo book between rehearsals; plain GET is a health check.
