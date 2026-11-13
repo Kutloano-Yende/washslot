@@ -168,11 +168,22 @@ export function directionsLink(address: string): string {
 export function ticketFor(booking: Booking): string {
   const [a, b] = booking.staff ?? [];
   const branch = BRANCHES.find((x) => x.name === booking.branch) ?? pickBranch(undefined);
+  const mode = booking.mode ?? (booking.suburb === WASH_BAY ? "bring" : "home");
+  const place = booking.address ? `${booking.address}, ${booking.suburb}` : booking.suburb;
   const where =
-    booking.suburb === WASH_BAY
+    mode === "bring"
       ? `Please bring your car to ${branch.name} (${branch.address.replace(", South Africa", "")}) and arrive on time. Directions from where you are: ${directionsLink(branch.address)}`
-      : `Our crew will come to you in ${booking.suburb}; please be ready on time.`;
-  return `Your car is number ${booking.queue_number} on ${dayName(booking.date_sast)}. ${a} and ${b} will be responsible for it. ${where} Your schedule is booked.`;
+      : mode === "collect"
+        ? `Our team will collect your car from ${place} and bring it back when it is done; please have it ready on time.`
+        : `Our crew will come to you at ${place}; please be ready on time.`;
+  const scent = booking.scent
+    ? ` We will use ${booking.scent === "No scent" ? "no scent" : `${booking.scent.toLowerCase()} scent`}${
+        booking.allergies && booking.allergies !== "none"
+          ? ` and we have noted your allergy (${booking.allergies}), so we will choose suitable products`
+          : ""
+      }.`
+    : "";
+  return `Your car is number ${booking.queue_number} on ${dayName(booking.date_sast)}. ${a} and ${b} will be responsible for it. ${where}${scent} Your schedule is booked.`;
 }
 
 function dayName(iso: string): string {
@@ -191,7 +202,7 @@ function parseDate(text: string): string | null {
     return "2026-11-14";
   }
   if (/13\s*nov|today\b/.test(t)) return DEMO_TODAY;
-  const iso = t.match(/\b(2026-\d{2}-\d{2})\b/);
+  const iso = t.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   if (iso) return iso[1];
   return null;
 }

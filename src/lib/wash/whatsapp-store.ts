@@ -5,17 +5,12 @@
  * In-memory on globalThis: fine for a single long-lived process (the laptop demo).
  * On serverless hosting, instances can be recycled, so state may reset between messages.
  */
-import { handleEnquiry, seedLedger, type AgentResult, type Booking, type Ledger, type Offer } from "./engine.ts";
-import { friendlyReply } from "./friendly.ts";
+import { seedLedger, type AgentResult, type Ledger } from "./engine.ts";
+import { converse, emptyState, type IntakeState } from "./intake.ts";
 
 export type ThreadMessage = { role: "customer" | "assistant"; text: string; at: string; status?: string };
 
-type Convo = {
-  offer: Offer | null;
-  detail: Offer | null;
-  lastBooking: Booking | null;
-  thread: ThreadMessage[];
-};
+type Convo = IntakeState & { thread: ThreadMessage[] };
 
 type Store = { ledger: Ledger; convos: Map<string, Convo> };
 
@@ -41,37 +36,25 @@ export function cleanProfileName(raw: string | null | undefined): string | null 
   return cleaned.length >= 2 ? cleaned : null;
 }
 
-/** Process one inbound WhatsApp message through the same engine the web demo uses. */
+/** Process one inbound WhatsApp message: remembered, one question at a time, engine does the pricing and booking. */
 export function processMessage(
   from: string,
   body: string,
   profileName: string | null = null,
-): { reply: string; result: AgentResult } {
+): { reply: string; result: AgentResult | null } {
   const s = store();
-  const convo = s.convos.get(from) ?? { offer: null, detail: null, lastBooking: null, thread: [] };
-  const result = handleEnquiry(
-    s.ledger,
-    body,
-    convo.offer,
-    convo.detail,
-    convo.lastBooking,
-    cleanProfileName(profileName),
-  );
-  s.ledger = result.ledger;
-  convo.offer = result.offer;
-  convo.detail = result.detail_check;
-  if (result.booking) convo.lastBooking = result.booking;
-  // The web demo says "nothing was sent outside this chat"; over real WhatsApp that line is wrong.
-  const plain = result.customer_draft.replace(/\s*This chat is the only message — nothing was sent outside it\./, "");
-  // Warm, human tone for WhatsApp. Facts (prices, slots, IDs) are copied from `plain`, never re-generated.
-  const firstName = (result.offer?.demo_name ?? result.booking?.demo_name ?? cleanProfileName(profileName))
-    ?.split(/\s+/)[0] ?? null;
-  const reply = friendlyReply({ message: body, draft: plain, name: firstName });
+  const convo: Convo = s.convos.get(from) ?? { ...emptyState(), thread: [] };
+  const r = converse(s.ledger, convo, body, { profileName: cleanProfileName(profileName) });
+  s.ledger = r.ledger;
+  convo.draft = r.state.draft;
+  convo.offer = r.state.offer;
+  convo.detail = r.state.detail;
+  convo.lastBooking = r.state.lastBooking;
   const now = new Date().toISOString();
   convo.thread.push({ role: "customer", text: body, at: now });
-  convo.thread.push({ role: "assistant", text: reply, at: now, status: result.status });
+  convo.thread.push({ role: "assistant", text: r.reply, at: now, status: r.status });
   s.convos.set(from, convo);
-  return { reply, result };
+  return { reply: r.reply, result: r.result };
 }
 
 /** Snapshot for the /live page. Phone numbers are masked to the last 4 digits. */

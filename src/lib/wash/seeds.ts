@@ -37,6 +37,14 @@ export type Booking = {
   queue_number?: number;
   /** Which wash the client was sent to, when they bring the car (see BRANCHES). */
   branch?: string;
+  /** How the car is washed: client brings it, we collect it, or the crew goes to their home. */
+  mode?: "bring" | "collect" | "home";
+  /** Street address for collect / home jobs. */
+  address?: string;
+  make?: string;
+  scent?: string;
+  /** Free text, or "none". Used to choose suitable products. */
+  allergies?: string;
 };
 
 export const SERVICES: Service[] = [

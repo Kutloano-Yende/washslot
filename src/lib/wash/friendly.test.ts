@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { processMessage, resetStore } from "./whatsapp-store.ts";
+import { handleEnquiry, seedLedger, type Booking, type Ledger, type Offer } from "./engine.ts";
+import { friendlyReply } from "./friendly.ts";
 
-const send = (from: string, body: string, profile: string | null = "Naledi Test") =>
-  processMessage(`whatsapp:+2700000${from}`, body, profile).reply;
+// The friendly layer re-words the ENGINE's replies, so it is tested straight against the engine
+// (the step-by-step intake in front of it is covered by intake.test.ts).
+let ledger: Ledger = seedLedger();
+const convos = new Map<string, { offer: Offer | null; detail: Offer | null; last: Booking | null }>();
+const resetStore = () => {
+  ledger = seedLedger();
+  convos.clear();
+};
+
+const send = (from: string, body: string, name: string | null = "Naledi") => {
+  const c = convos.get(from) ?? { offer: null, detail: null, last: null };
+  const r = handleEnquiry(ledger, body, c.offer, c.detail, c.last, name);
+  ledger = r.ledger;
+  convos.set(from, { offer: r.offer, detail: r.detail_check, last: r.booking ?? c.last });
+  const first = (r.offer?.demo_name ?? r.booking?.demo_name ?? name)?.split(/\s+/)[0] ?? null;
+  return friendlyReply({ message: body, draft: r.customer_draft, name: first });
+};
 
 test("greeting: introduces itself, says hey, and lists what it needs", () => {
   resetStore();
